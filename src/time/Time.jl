@@ -10,8 +10,16 @@ export DayCount, Actual360, Actual365, Thirty360, BondThirty360, EuroBondThirty3
 # BusinessCalendar.jl
 export BusinessCalendar, WesternCalendar, OrthodoxCalendar, UnitedStatesCalendar, USSettlementCalendar, USNYSECalendar, USNERCCalendar, USGovernmentBondCalendar
 
+# schedule.jl
+export BusinessDayConvention, Unadjusted, DateGenerationRule, DateGenerationForwards, DateGenerationBackwards, Schedule
+
+# tenor_period.jl
+export TenorPeriod
+
 include("Frequency.jl")
 include("DayCount.jl")
 include("BusinessCalendar.jl")
+include("schedule.jl")
+include("tenor_period.jl")
 
 end

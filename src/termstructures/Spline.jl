@@ -6,6 +6,7 @@ type Spline
   d::Vector{Float64}
 end
 
+# adapted from here: http://sepwww.stanford.edu/sep/sergey/128A/answers6.pdf
 function gen_splines(x_vert::Vector{Int64}, y_vert::Vector{Float64})
   n = length(x_vert)
   h = zeros(n - 1)

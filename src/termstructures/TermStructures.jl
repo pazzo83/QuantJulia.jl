@@ -37,7 +37,7 @@ end
 discount(yts::YieldTermStructure, date::Date) = discount(yts, time_from_reference(yts, date))
 
 function discount(yts::YieldTermStructure, time_frac::Float64)
-  disc = discount_impl(time_frac)
+  disc = discount_impl(yts, time_frac)
   if length(yts.jump_times) == 0
     return disc
   end
