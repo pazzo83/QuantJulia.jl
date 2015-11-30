@@ -1,4 +1,4 @@
-using QuantJulia.Time, QuantJulia.CF
+using QuantJulia.Time, QuantJulia.CF, QuantJulia.TermStructures
 
 abstract Bond <: Instrument
 
@@ -14,6 +14,7 @@ type FixedRateBond <: Bond
   issueDate::Date
   startDate::Date
   maturityDate::Date
+  calculated::Bool
 
   function FixedRateBond(settlementDays::Int64, faceAmount::Float64, schedule::Schedule, coup_rate::Float64, dc::DayCount, paymentConvention::BusinessDayConvention,
     redemption::Float64, issueDate::Date, calendar::BusinessCalendar)
@@ -33,6 +34,6 @@ type FixedRateBond <: Bond
 
     coups = FixedRateLeg(schedule, faceAmount, coup_rate, calendar, paymentConvention, dc)
 
-    new(settlementDays, faceAmount, schedule, coups, dc, paymentConvention, redemption, calendar, issueDate, schedule.dates[1], maturityDate)
+    new(settlementDays, faceAmount, schedule, coups, dc, paymentConvention, redemption, calendar, issueDate, schedule.dates[1], maturityDate, false)
   end
 end
