@@ -5,6 +5,9 @@ module QuantJulia
 # Time module
 include("time/Time.jl")
 
+# Math module
+include("math/Math.jl")
+
 # Quotes
 include("quotes/Quotes.jl")
 
@@ -23,8 +26,8 @@ include("instruments/instruments.jl")
 # Pricing Engines
 include("pricing_engines/pricing_engines.jl")
 
-# Helpers
-include("helpers/bond_helpers.jl")
+# # Helpers NOW IN TERM STRUCTURE
+# include("helpers/bond_helpers.jl")
 
 type Settings
   evaluation_date::Date

@@ -1,26 +1,28 @@
 # Curves
 
-abstract Curve <: TermStructure
+using QuantJulia.Math, QuantJulia.Instrument
 
-type PiecewiseYieldCurve <: Curve
+abstract InterpolatedCurve{I, T, B} <: YieldTermStructure
+
+type PiecewiseYieldCurve{I, T, B} <: InterpolatedCurve{I, T, B}
   reference_date::Date
   instruments::Vector{Instrument}
   dc::DayCounter
-  interp::Interpolation
-  trait::BootstrapTrait
+  interp::I
+  trait::T
   accuracy::Float64
-  boot::Bootstrap
-  times::Vector{Int64}
+  boot::B
+  times::Vector{Float64}
   data::Vector{Float64}
   errors::Vector{Function}
   validCurve::Bool
 end
 
-function PiecewiseYieldCurve(reference_date::Date, instruments::Vector{Instrument}, dc::DayCounter, interp::Interpolation, trait::BootstrapTrait, accuracy::Float64, boot::Bootstrap)
+function PiecewiseYieldCurve{I, T, B}(reference_date::Date, instruments::Vector{Instrument}, dc::DayCounter, interp::I, trait::T, accuracy::Float64, boot::B)
   # get the initial length of instruments
   n = len(instruments)
   # create an initial state of the curve
-  pyc = PiecewiseYieldCurve(reference_date,
+  pyc = PiecewiseYieldCurve{I, T, B}(reference_date,
                             instruments,
                             dc,
                             interp,
@@ -36,4 +38,15 @@ function PiecewiseYieldCurve(reference_date::Date, instruments::Vector{Instrumen
   initialize(boot, pyc)
 
   return pyc
+end
+
+
+max_date(curve::InterpolatedCurve) = curve.dates[end]
+
+function discount_impl(curve::InterpolatedCurve, t::Float64)
+  if t < curve.times[end]
+    return value(curve.interp, t)
+  end
+
+  # do flat fwd extrapolation
 end
