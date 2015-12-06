@@ -2,15 +2,13 @@
 const avg_rate = 0.05
 const max_rate = 1.0
 
-abstract BootstrapTrait
-
 # Discount bootstrap trait
 type Discount <: BootstrapTrait end
 
 initial_value(::Discount) = 1.0
 max_iterations(::Discount) = 100
 
-function guess(::Discount, i::Int64, ts::TermStructure, valid::Boolean)
+function guess(::Discount, i::Int64, ts::TermStructure, valid::Bool)
   if valid
     # return previous iteration value
     return ts.data[i]
@@ -25,7 +23,7 @@ function guess(::Discount, i::Int64, ts::TermStructure, valid::Boolean)
   return exp(-r * ts.times[i])
 end
 
-function min_value_after(::Discount, i::Int64, ts::TermStructure, valid::Boolean)
+function min_value_after(::Discount, i::Int64, ts::TermStructure, valid::Bool)
   if valid
     return ts.data[end] / 2.0
   end
@@ -44,8 +42,6 @@ function update_guess!(::Discount, i::Int64, ts::TermStructure, discount::Float6
 end
 
 # BOOTSTRAPPING
-abstract Bootstrap
-
 type IterativeBootstrap <: Bootstrap end
 
 # returns initial bootstrap state to Term Structure
@@ -67,6 +63,9 @@ function initialize(::IterativeBootstrap, ts::TermStructure)
     ts.times[i] = time_from_reference(ts, ts.instruments[i].maturityDate)
     ts.errors[i] = bootstrap_error(ts, i)
   end
+
+  # initialize interpolation
+  initialize!(ts.interp, ts.times, ts.data)
 end
 
 function calculate!(::Bootstrap, ts::TermStructure, solver::Solver1D, first_solver::Solver1D)
@@ -124,7 +123,7 @@ function bootstrap_error(ts::TermStructure, i::Int64)
   function bootstrap_error_inner(guess::Float64)
     # update trait
     update_guess!(ts.trait, i, ts, guess)
-    update!(ts.interp, i)
+    update!(ts.interp, i, guess)
     return quote_error(ts, ts.inst)
   end
 

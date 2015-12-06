@@ -1,6 +1,4 @@
-using QuantJulia.Time, QuantJulia.CF, QuantJulia.TermStructures
-
-abstract Bond <: Instrument
+using QuantJulia.Time
 
 type FixedRateBond <: Bond
   settlementDays::Int64

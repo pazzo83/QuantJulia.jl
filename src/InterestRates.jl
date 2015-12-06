@@ -1,11 +1,7 @@
 # Interest Rates
-module InterestRates
+# module InterestRates
 
 using QuantJulia.Time
-
-export CompoundingType, ContinuousCompounding, SimpleCompounding, CompoundedCompounding, SimpleThenCompounded
-
-export InterestRate, discount_factor, compound_factor, equivalent_rate, implied_rate
 
 # Compounding Types
 abstract CompoundingType
@@ -78,4 +74,4 @@ function implied_rate(compound::Float64, dc::DayCount, comp::CompoundingType, da
   return implied_rate(compound, dc, comp, year_fraction(dc, date1, date2, ref_start, ref_end), freq)
 end
 
-end
+# end

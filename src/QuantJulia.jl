@@ -8,22 +8,70 @@ include("time/Time.jl")
 # Math module
 include("math/Math.jl")
 
-# Quotes
+# MAIN MODULE CODE
+
+export
+    # abstract_types.jl
+    CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap,
+    CashFlows, CashFlow, Coupon, Instrument, Bond, PricingEngine,
+
+    # quotes/Quotes/jl
+    Quote,
+
+    # InterestRates.jl
+    ContinuousCompounding, SimpleCompounding, CompoundedCompounding, SimpleThenCompounded,
+    InterestRate, discount_factor, compound_factor, equivalent_rate, implied_rate,
+
+    # termstructures/yield_term_structure.jl
+    FlatForwardTermStructure, JumpDate, JumpTime,
+    check_range, max_date, time_from_reference, discount, zero_rate, forward_rate, discount_impl,
+
+    # termstructures/curve.jl
+    PiecewiseYieldCurve, max_date,
+
+    # termstructures/bootstrap.jl
+    Discount, guess, min_value_after, max_value_after,
+    IterativeBootstrap, initialize, calculate!, quote_error,
+
+    # termstructures/bond_helpers.jl
+    implied_quote, clean_price, dirty_price, settlement_date,
+
+    # cash_flows/cash_flows.jl
+    SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg,
+
+    # instruments/bond.jl
+    FixedRateBond,
+
+    # pricing_engines/pricing_engines.jl
+    DiscountingBondEngine, calculate
+
+# abstract types
+include("abstract_types.jl")
+
+# Quotes ----------------------------
 include("quotes/Quotes.jl")
 
-# Interest Rates
+# Interest Rates ---------------------------------
 include("InterestRates.jl")
 
-# Term Structures
-include("termstructures/TermStructures.jl")
+# Term Structures -----------------------------------
+# yield term structures
+include("termstructures/yield_term_structure.jl")
+# Curves
+include("termstructures/curve.jl")
+# bootstrapping
+include("termstructures/bootstrap.jl")
+# helpers
+include("termstructures/bond_helpers.jl")
 
-# cash flows
+# Cash Flows ------------------------------------
 include("cash_flows/cash_flows.jl")
 
-# Instruments
-include("instruments/instruments.jl")
+# Instruments ------------------------
+# bond
+include("instruments/bond.jl")
 
-# Pricing Engines
+# Pricing Engines ------------------------
 include("pricing_engines/pricing_engines.jl")
 
 # # Helpers NOW IN TERM STRUCTURE
@@ -40,7 +88,5 @@ function set_eval_date!(sett::Settings, d::Date)
 end
 
 export Settings, settings, set_eval_date!
-
-using QuantJulia.Time, QuantJulia.Quotes, QuantJulia.TermStructures
 
 end

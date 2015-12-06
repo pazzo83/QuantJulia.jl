@@ -1,5 +1,5 @@
 # main term structures
-using QuantJulia.Time, QuantJulia.Quotes, QuantJulia.InterestRates
+using QuantJulia.Time
 
 # core TermStructure methods
 function check_range(ts::TermStructure, date::Date)
@@ -13,9 +13,6 @@ end
 max_date(ts) = ts.reference_date + Date.Year(100)
 
 time_from_reference(ts::TermStructure, date::Date) = year_fraction(ts.dc, ts.reference_date, date)
-
-# YieldTermStructure
-abstract YieldTermStructure <: TermStructure
 
 type JumpDate
   ts_quote::Quote

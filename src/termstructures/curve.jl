@@ -1,13 +1,11 @@
 # Curves
 
-using QuantJulia.Math, QuantJulia.Instrument
-
-abstract InterpolatedCurve{I, T, B} <: YieldTermStructure
+using QuantJulia.Math, QuantJulia.Time
 
 type PiecewiseYieldCurve{I, T, B} <: InterpolatedCurve{I, T, B}
   reference_date::Date
   instruments::Vector{Instrument}
-  dc::DayCounter
+  dc::DayCount
   interp::I
   trait::T
   accuracy::Float64
@@ -18,7 +16,7 @@ type PiecewiseYieldCurve{I, T, B} <: InterpolatedCurve{I, T, B}
   validCurve::Bool
 end
 
-function PiecewiseYieldCurve{I, T, B}(reference_date::Date, instruments::Vector{Instrument}, dc::DayCounter, interp::I, trait::T, accuracy::Float64, boot::B)
+function PiecewiseYieldCurve{I, T, B}(reference_date::Date, instruments::Vector{Instrument}, dc::DayCount, interp::I, trait::T, accuracy::Float64, boot::B)
   # get the initial length of instruments
   n = len(instruments)
   # create an initial state of the curve
@@ -49,4 +47,10 @@ function discount_impl(curve::InterpolatedCurve, t::Float64)
   end
 
   # do flat fwd extrapolation
+end
+
+function calculate!(curve::InterpolatedCurve)
+  calculate!(curve.boot)
+
+  return curve
 end

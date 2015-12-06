@@ -1,11 +1,8 @@
 # module Instruments
-module Instruments
+# module Instruments
 
-abstract Instrument
+# define abstract types
 
-# bond.jl
-export Bond, FixedRateBond
 
-include("bond.jl")
 
-end
+# end

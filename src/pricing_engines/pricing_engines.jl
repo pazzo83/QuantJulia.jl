@@ -1,11 +1,6 @@
 # Pricing Engines module
-module PricingEngines
+# module PricingEngines
 
-using QuantJulia.TermStructures, QuantJulia.Instruments, QuantJulia.CF
-
-export PricingEngine, DiscountingBondEngine
-
-abstract PricingEngine
 type DiscountingBondEngine <: PricingEngine end
 
 function calculate(::DiscountingBondEngine, yts::YieldTermStructure, bond::Bond)
@@ -17,4 +12,4 @@ function calculate(::DiscountingBondEngine, yts::YieldTermStructure, bond::Bond)
   return value
 end
 
-end
+# end

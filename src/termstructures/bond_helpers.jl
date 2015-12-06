@@ -1,6 +1,4 @@
 # bond helper functions
-using QuantJulia.Instruments
-
 function implied_quote(bond::Bond, yts::YieldTermStructure, pe::PricingEngine, clean_price::Bool)
   settlement_value = calculate(pe, yts, bond)
   return clean_price ? clean_price(bond, settlement_value, settlement_date(bond)) : dirty_price(bond, settlement_value, settlement_date(bond))
