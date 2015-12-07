@@ -4,12 +4,13 @@ using QuantJulia
 
 function build_bonds(bond_mats, bond_rates, tenor, conv, rule, calendar, dc, freq, issue_date)
   bonds = Vector{FixedRateBond}(10)
+  pricing_engine = DiscountingBondEngine()
 
   for i =1:10
     term_date = bond_mats[i]
     rate = bond_rates[i] / 100
     sched = QuantJulia.Time.Schedule(issue_date, term_date, tenor, conv, conv, rule, true)
-    bond = FixedRateBond(0, 100.0, sched, rate, dc, conv, 100.0, issue_date, calendar)
+    bond = FixedRateBond(0, 100.0, sched, rate, dc, conv, 100.0, issue_date, calendar, pricing_engine)
     bonds[i] = bond
   end
 
@@ -44,3 +45,13 @@ function main()
   bonds = build_bonds(bond_mats, bond_rates, tenor, conv, rule, calendar, dc, freq, issue_date)
   npvs = get_npvs(bonds, issue_date, calendar, dc, freq)
 end
+
+interp = QuantJulia.Math.LogInterpolation()
+trait = Discount()
+bootstrap = IterativeBootstrap()
+
+yts = PiecewiseYieldCurve(issue_date, bonds, dc, interp, trait, 0.00000000001, bootstrap)
+
+solver = QuantJulia.Math.BrentSolver()
+solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
+calculate!(IterativeBootstrap(), yts, solver2, solver)

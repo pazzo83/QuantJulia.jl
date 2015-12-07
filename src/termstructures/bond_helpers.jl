@@ -1,7 +1,8 @@
 # bond helper functions
-function implied_quote(bond::Bond, yts::YieldTermStructure, pe::PricingEngine, clean_price::Bool)
-  settlement_value = calculate(pe, yts, bond)
-  return clean_price ? clean_price(bond, settlement_value, settlement_date(bond)) : dirty_price(bond, settlement_value, settlement_date(bond))
+function implied_quote(bond::Bond, yts::YieldTermStructure, pe::PricingEngine, clean::Bool = true)
+  calculate!(pe, yts, bond, true)
+  settlement_value = bond.settlementValue
+  return clean ? clean_price(bond, settlement_value, settlement_date(bond)) : dirty_price(bond, settlement_value, settlement_date(bond))
 end
 
 clean_price(bond::Bond, settlement_value::Float64, settlement_date::Date) = dirty_price(bond, settlement_value, settlement_date) - accrued_amount(bond, settlement_date)
@@ -14,4 +15,8 @@ function settlement_date(bond::Bond, d::Date = Date())
   end
 
   return d + bond.settlementDays
+end
+
+function accrued_amount(bond::Bond, settlement_date::Date)
+  return accrued_amount(bond.cashflows, settlement_date) * 100.0 / bond.faceAmount
 end

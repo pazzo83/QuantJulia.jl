@@ -2,7 +2,7 @@
 module Math
 
 # interpolation.jl
-export Interpolation, LogInterpolation, update!, locate
+export Interpolation, LogInterpolation, update!, locate, initialize!, value
 
 include("interpolation.jl")
 

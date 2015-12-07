@@ -28,9 +28,9 @@ end
 
 # if no values are provided
 function LogInterpolation()
-  x_vals = Vector{Float64}
-  y_vals = Vector{Float64}
-  s = Vector{Float64}
+  x_vals = Vector{Float64}()
+  y_vals = Vector{Float64}()
+  s = Vector{Float64}()
 
   interpolator = LinearInterpolation(x_vals, y_vals, s)
 
@@ -43,8 +43,8 @@ function initialize!(interp::LogInterpolation, x_vals::Vector{Float64}, y_vals::
   interp.y_vals = y_vals
 
   log_y = zeros(length(y_vals))
-  for i in y_vals:
-    log_y = log(i)
+  for i = 1:length(y_vals)
+    log_y[i] = log(i)
   end
 
   initialize!(interp.interpolator, x_vals, log_y)
@@ -76,7 +76,7 @@ end
 
 # update if value passed in
 function update!(interp::LogInterpolation, idx::Int64, val::Float64)
-  interp.y_vals[i] = val
+  interp.y_vals[idx] = val
 
   update!(interp, idx)
 
@@ -87,7 +87,7 @@ end
 function update!(interp::LinearInterpolation, idx::Int64)
   for i = 2:idx
     dx = interp.x_vals[i] - interp.x_vals[i - 1]
-    s[i - 1] = (interp.y_vals[i] - interp.y_vals[i - 1]) / dx
+    interp.s[i - 1] = (interp.y_vals[i] - interp.y_vals[i - 1]) / dx
   end
 
   return interp
@@ -95,12 +95,13 @@ end
 
 # locate x
 function locate(interp::Interpolation, val::Float64)
-  if x < interp.x_vals[1]
-    return 0
-  elseif x > interp.x_vals[end - 1]
-    return interp.x_vals[end] - interp.x_vals[1] - 2
+  if val < interp.x_vals[1]
+    return 1
+  elseif val >= interp.x_vals[end]
+    # return interp.x_vals[end] - interp.x_vals[1] - 2
+    return length(interp.x_vals)
   else
-    return findfirst(x[1:end - 1] .> 1) - x[1] - 1
+    return findfirst(interp.x_vals .> val) - 1 # need to look at this
   end
 end
 

@@ -74,4 +74,62 @@ function npv(leg::Leg, yts::YieldTermStructure, settlement_date::Date, npv_date:
   return totalNPV / discount(yts, npv_date)
 end
 
+# functions for sorting and finding
+sort_cashflow(cf::Coupon) = cf.paymentDate
+prev_cf(cf::Coupon, d::Date) = d > cf.paymentDate
+next_cf(cf::Coupon, d::Date) = d < cf.paymentDate
+
+function previous_cashflow_date(cf::FixedRateLeg, settlement_date::Date)
+  # right now we can assume cashflows are sorted by date because of schedule
+  prev_cashflow_idx = findprev(prev_cf, cf.coupons, length(cf.coupons), settlement_date)
+
+  return prev_cashflow_idx == 0 ? 0 : cf.coupons[prev_cashflow_idx].paymentDate
+end
+
+function accrual_days(cf::CashFlows, dc::DayCount, settlement_date::Date)
+  last_payment = previous_cashflow_date(cf, settlement_date)
+
+  if last_payment == 0
+    return 0.0
+  else
+    return day_count(dc, last_payment, settlement_date)
+  end
+end
+
+function next_cashflow(cf::Leg, settlement_date::Date)
+  if settlement_date > cf.coupons[end].paymentDate
+    return length(cf.coupons)
+  end
+
+  return findnext(next_cf, cf.coupons, 1, settlement_date)
+end
+
+function accrued_amount(cf::Leg, settlement_date::Date)
+  next_cf_idx = next_cashflow(cf, settlement_date)
+
+  if cf.coupons[next_cf_idx] == length(cf.coupons)
+    return 0.0
+  end
+
+  result = 0.0
+
+  next_cf = cf.coupons[next_cf_idx]
+  paymentDate = next_cf.paymentDate
+  i = 0
+  while next_cf == paymentDate
+    result += accrued_amount(next_cf, settlement_date)
+  end
+
+  return result
+end
+
+function accrued_amount(coup::FixedRateCoupon, settlement_date::Date)
+  if settlement_date <= coup.accrualStartDate || settlement_date > coup.paymentDate
+    return 0.0
+  end
+
+  return coup.nominal * (compound_factor(coup.rate, coup.accrualStartDate, min(settlement_date, coup.accrualEndDate)) - 1.0)
+end
+
+
 # end
