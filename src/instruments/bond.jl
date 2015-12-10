@@ -39,3 +39,32 @@ function FixedRateBond(settlementDays::Int64, faceAmount::Float64, schedule::Sch
 end
 
 value(b::FixedRateBond) = b.faceAmount
+get_settlement_date(b::Bond) = b.issueDate
+
+function notional(bond::Bond, d::Date)
+  if d > bond.maturityDate
+    return 0.0
+  else
+    return bond.faceAmount
+  end
+end
+
+# bond functions
+accrued_amount(bond::Bond, settlement::Date) = accrued_amount(bond.cashflows, false, settlement) * 100.0 / notional(bond, settlement)
+
+function yield(bond::Bond, clean_price::Float64, dc::DayCount, compounding::CompoundingType, freq::Frequency, settlement::Date, accuracy::Float64 = 1.0e-10,
+              max_iter::Integer = 100, guess::Float64 = 0.05)
+  dirty_price = clean_price + accrued_amount(bond, settlement)
+  dirty_price /= 100.0 / notional(bond, settlement)
+
+  return yield(bond.cashflows, dirty_price, dc, compounding, freq, false, settlement, settlement, accuracy, max_iter, guess)
+end
+
+function duration(bond::Bond, yld::InterestRate, duration::Duration, settlement_date::Date)
+  return duration(duration, bond.cashflows, yld, false, settlement_date)
+end
+
+function duration(bond::Bond, yld::Float64, dc::DayCount, compounding::CompoundingType, freq::Frequency, duration::Duration, settlement_date::Date)
+  y = InterestRate(yld, dc, compounding, freq)
+  return duration(bond, y, duration, settlement_date)
+end

@@ -32,13 +32,13 @@ include("math/Math.jl")
 export
     # abstract_types.jl
     CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap,
-    CashFlows, CashFlow, Coupon, Instrument, Bond, PricingEngine,
+    FittingMethod, CashFlows, CashFlow, Coupon, Instrument, Bond, PricingEngine, Duration,
 
     # quotes/Quotes/jl
     Quote,
 
     # InterestRates.jl
-    ContinuousCompounding, SimpleCompounding, CompoundedCompounding, SimpleThenCompounded,
+    ContinuousCompounding, SimpleCompounding, CompoundedCompounding, SimpleThenCompounded, ModifiedDuration,
     InterestRate, discount_factor, compound_factor, equivalent_rate, implied_rate,
 
     # termstructures/yield_term_structure.jl
@@ -46,20 +46,24 @@ export
     check_range, max_date, time_from_reference, discount, zero_rate, forward_rate, discount_impl,
 
     # termstructures/curve.jl
-    PiecewiseYieldCurve, max_date,
+    PiecewiseYieldCurve, FittedBondDiscountCurve, max_date,
 
     # termstructures/bootstrap.jl
     Discount, guess, min_value_after, max_value_after,
     IterativeBootstrap, initialize, calculate!, quote_error,
 
+    # termstructures/nonlinear_fitting_methods.jl
+    ExponentialSplinesFitting, discount_function,
+
     # termstructures/bond_helpers.jl
     implied_quote, clean_price, dirty_price, settlement_date,
 
     # cash_flows/cash_flows.jl
-    SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg,
+    SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, IRRFinder, operator, duration, yield, previous_cashflow_date,
+    accrual_days, accrual_days, next_cashflow, has_occurred, 
 
     # instruments/bond.jl
-    FixedRateBond,
+    FixedRateBond, value, get_settlement_date, notional, accrued_amount, yield, duration,
 
     # pricing_engines/pricing_engines.jl
     DiscountingBondEngine, calculate
@@ -82,6 +86,8 @@ include("termstructures/curve.jl")
 include("termstructures/bootstrap.jl")
 # helpers
 include("termstructures/bond_helpers.jl")
+# nonlinear fitting methods
+include("nonlinear_fitting_methods.jl")
 
 # Cash Flows ------------------------------------
 include("cash_flows/cash_flows.jl")

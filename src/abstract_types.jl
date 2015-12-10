@@ -5,9 +5,11 @@ abstract Bond <: Instrument
 # Term Structures
 abstract TermStructure
 abstract YieldTermStructure <: TermStructure
-abstract InterpolatedCurve{I, T, B} <: YieldTermStructure
+abstract Curve <: YieldTermStructure
+abstract InterpolatedCurve{I} <: Curve
 abstract BootstrapTrait
 abstract Bootstrap
+abstract FittingMethod
 
 # Pricing Engines
 abstract PricingEngine
@@ -16,3 +18,4 @@ abstract PricingEngine
 abstract CashFlows
 abstract CashFlow
 abstract Coupon <: CashFlow
+abstract Duration

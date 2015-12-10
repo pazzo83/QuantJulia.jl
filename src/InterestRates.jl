@@ -10,6 +10,9 @@ type SimpleCompounding <: CompoundingType end     # (1+r*t)
 type CompoundedCompounding <: CompoundingType end # (1 + r)^t
 type SimpleThenCompounded <: CompoundingType end
 
+## Durations ##
+type ModifiedDuration <: Duration end
+
 type InterestRate
   rate::Float64
   dc::DayCount
