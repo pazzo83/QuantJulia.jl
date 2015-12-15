@@ -46,21 +46,22 @@ export
     check_range, max_date, time_from_reference, discount, zero_rate, forward_rate, discount_impl,
 
     # termstructures/curve.jl
-    PiecewiseYieldCurve, FittedBondDiscountCurve, max_date,
+    PiecewiseYieldCurve, FittedBondDiscountCurve, FittingCost, NullCurve,
+    max_date, discount, calculate!, initialize!, value,
 
     # termstructures/bootstrap.jl
     Discount, guess, min_value_after, max_value_after,
     IterativeBootstrap, initialize, calculate!, quote_error,
 
     # termstructures/nonlinear_fitting_methods.jl
-    ExponentialSplinesFitting, discount_function,
+    ExponentialSplinesFitting, discount_function, guess_size,
 
     # termstructures/bond_helpers.jl
     implied_quote, clean_price, dirty_price, settlement_date,
 
     # cash_flows/cash_flows.jl
-    SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, IRRFinder, operator, duration, yield, previous_cashflow_date,
-    accrual_days, accrual_days, next_cashflow, has_occurred, 
+    SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
+    accrual_days, accrual_days, next_cashflow, has_occurred,
 
     # instruments/bond.jl
     FixedRateBond, value, get_settlement_date, notional, accrued_amount, yield, duration,
@@ -87,7 +88,7 @@ include("termstructures/bootstrap.jl")
 # helpers
 include("termstructures/bond_helpers.jl")
 # nonlinear fitting methods
-include("nonlinear_fitting_methods.jl")
+include("termstructures/nonlinear_fitting_methods.jl")
 
 # Cash Flows ------------------------------------
 include("cash_flows/cash_flows.jl")

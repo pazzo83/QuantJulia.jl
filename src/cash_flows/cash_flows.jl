@@ -69,20 +69,21 @@ type IRRFinder
   freq::Frequency
   includeSettlementDateFlows::Bool
   settlementDate::Date
-  nvpDate::Date
+  npvDate::Date
 end
 
 ## this function can pass itself or its derivative ##
 function operator(finder::IRRFinder)
-  yld = InterestRate(y, finder.dc, finder.compounding, finder.freq)
   function _inner(y::Float64)
-    npv = npv(finder.leg, yld, finder.includeSettlementDateFlows, finder.settlementDate, finder.npvDate)
-    return finder.npv - npv
+    yld = InterestRate(y, finder.dc, finder.comp, finder.freq)
+    NPV = npv(finder.leg, yld, finder.includeSettlementDateFlows, finder.settlementDate, finder.npvDate)
+    return finder.npv - NPV
   end
 
   # derivative
   function _inner(y::Float64, ::Derivative)
-    return duration(ModifiedDuration(), finder.leg, yld, finder.includeSettlementDateFlows, finder.settlementDate, finder.npvDate)
+    yld = InterestRate(y, finder.dc, finder.comp, finder.freq)
+    return duration(ModifiedDuration(), finder.leg, yld, finder.dc, finder.includeSettlementDateFlows, finder.settlementDate, finder.npvDate)
   end
 
   return _inner
@@ -96,15 +97,15 @@ function npv(leg::Leg, yts::YieldTermStructure, settlement_date::Date, npv_date:
     return totalNPV
   end
 
-  for i in leg.coupons
+  for i in leg
     #TODO: check has occurred
-    if i.paymentDate > settlement_date
-      totalNPV += amount(i) * discount(yts, i.paymentDate)
+    if date(i) > settlement_date
+      totalNPV += amount(i) * discount(yts, date(i))
     end
   end
 
-  # redemption
-  totalNPV += amount(leg.redemption) * discount(yts, leg.redemption.date)
+  # redemption - not needed with new iterator
+  # totalNPV += amount(leg.redemption) * discount(yts, leg.redemption.date)
 
   return totalNPV / discount(yts, npv_date)
 end
@@ -118,42 +119,51 @@ function npv(leg::Leg, y::InterestRate, include_settlement_cf::Bool, settlement_
   discount = 1.0
   last_date = npv_date
 
-  for cp in leg.coupons
-    coupon_date = cp.paymentDate
-    amount = amount(cp)
+  for cp in leg
+    coupon_date = date(cp)
+    amount_ = amount(cp)
 
-    ref_start_date = cp.refPeriodStart
-    ref_end_date = cp.refPeriodEnd
+    if isa(cp, FixedRateCoupon)
+      ref_start_date = cp.refPeriodStart
+      ref_end_date = cp.refPeriodEnd
+    else
+      if last_date == npv_date
+        ref_start_date = coupon_date - Dates.Year(1)
+      else
+        ref_start_date = last_date
+      end
+      ref_end_date = coupon_date
+    end
 
     b = discount_factor(y, last_date, coupon_date, ref_start_date, ref_end_date)
 
     discount *= b
     last_date = coupon_date
 
-    totalNPV += amount * discount
+    totalNPV += amount_ * discount
   end
 
-  # redemption
-  redempt_date = leg.redemption.date
-  amount = amount(leg.redemption)
+  # redemption - not needed with iterator
+  #redempt_date = leg.redemption.date
+  # amount = amount(leg.redemption)
 
-  b = discount_factor(leg.redemption, last_date, redempt_date, last_date, redempt_date)
-  discount *= b
-  totalNPV += amount * discount
+  # b = discount_factor(leg.redemption, last_date, redempt_date, last_date, redempt_date)
+  # discount *= b
+  # totalNPV += amount * discount
 
   # now we return total npv
   return totalNPV
 end
 
 ## Duration Calculations ##
-modified_duration_calc(::Simple, c::Float64, B::Float64, t::Float64, ::Float64, ::Float64) = c * B * B * t
-modified_duration_calc(::CompoundedCompounding, c::Float64, B::Float64, t::Float64, r::Float64, N::Float64) = c * t * B / (1 + r / N)
-modified_duration_calc(::ContinuousCompounding, c::Float64, B::Float64, t::Float64, ::Float64, ::Float64) = c * B * t
-modified_duration_calc(::SimpleThenCompounded, c::Float64, B::Float64, t::Float64, r::Float64, N::Float64) =
+modified_duration_calc(::SimpleCompounding, c::Float64, B::Float64, t::Float64, ::Float64, ::Frequency) = c * B * B * t
+modified_duration_calc(::CompoundedCompounding, c::Float64, B::Float64, t::Float64, r::Float64, N::Frequency) = c * t * B / (1 + r / QuantJulia.Time.value(N))
+modified_duration_calc(::ContinuousCompounding, c::Float64, B::Float64, t::Float64, ::Float64, ::Frequency) = c * B * t
+modified_duration_calc(::SimpleThenCompounded, c::Float64, B::Float64, t::Float64, r::Float64, N::Frequency) =
   t <= 1.0 / N ? modified_duration_calc(Simple(), c, B, t, r, N) : modified_duration_calc(CompoundedCompounding(), c, B, t, r, N)
 
-function duration(::ModifiedDuration, leg::Leg, y::InterestRate, include_settlement_cf::Bool, settlement_date::Date, npv_date::Date = Date())
-  if length(leg.coupons)
+function duration(::ModifiedDuration, leg::Leg, y::InterestRate, dc::DayCount, include_settlement_cf::Bool, settlement_date::Date, npv_date::Date = Date())
+  if length(leg.coupons) == 0 # TODO make this applicable to redemption too
     return 0.0
   end
 
@@ -168,12 +178,21 @@ function duration(::ModifiedDuration, leg::Leg, y::InterestRate, include_settlem
   N = y.freq
   last_date = npv_date
 
-  for cp in leg.coupons
+  for cp in leg
     # TODO check has occurred
     c = amount(cp)
-    coupon_date = cp.paymentDate
-    ref_start_date = cp.refPeriodStart
-    ref_end_date = cp.refPeriodEnd
+    coupon_date = date(cp)
+    if isa(cp, FixedRateCoupon)
+      ref_start_date = cp.refPeriodStart
+      ref_end_date = cp.refPeriodEnd
+    else
+      if last_date == npv_date
+        ref_start_date = coupon_date - Dates.Year(1)
+      else
+        ref_start_date = last_date
+      end
+      ref_end_date = coupon_date
+    end
 
     t += year_fraction(dc, last_date, coupon_date, ref_start_date, ref_end_date)
 
@@ -222,7 +241,7 @@ function next_cashflow(cf::Leg, settlement_date::Date)
   return findnext(next_cf, cf.coupons, 1, settlement_date)
 end
 
-function accrued_amount(cf::Leg, settlement_date::Date)
+function accrued_amount(cf::Leg, settlement_date::Date, include_settlement_cf::Bool = false)
   next_cf_idx = next_cashflow(cf, settlement_date)
 
   if cf.coupons[next_cf_idx] == length(cf.coupons)
@@ -266,5 +285,18 @@ function yield(leg::Leg, npv::Float64, dc::DayCount, compounding::CompoundingTyp
 
   return solve(solver, operator(obj_fun), accuracy, guess, guess / 10.0)
 end
+
+## ITERATORS ##
+# this is to iterate through cash flows and redemption
+Base.start(f::FixedRateLeg) = 1
+function Base.next(f::FixedRateLeg, state)
+  if state > length(f.coupons)
+    f.redemption, state + 1
+  else
+    f.coupons[state], state + 1
+  end
+end
+
+Base.done(f::FixedRateLeg, state) = length(f.coupons) + 1 < state
 
 # end

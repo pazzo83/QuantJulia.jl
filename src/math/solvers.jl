@@ -24,10 +24,10 @@ NewtonSolver(maxEvals::Integer = 100, lowerBoundEnforced::Bool = false, upperBou
   NewtonSolver(SolverInfo(maxEvals, lowerBoundEnforced, upperBoundEnforced, lowerBound, upperBound))
 
 type FiniteDifferenceNewtonSafe <: Solver1D
-  solverInfo::solverInfo
+  solverInfo::SolverInfo
 end
 FiniteDifferenceNewtonSafe(maxEvals::Integer = 100, lowerBoundEnforced::Bool = false, upperBoundEnforced::Bool = false, lowerBound::Float64 = 0.0, upperBound::Float64 = 0.0) =
-  FiniteDifferenceNewtonSafe(solverInfo(maxEvals, lowerBoundEnforced, upperBoundEnforced, lowerBound, upperBound))
+  FiniteDifferenceNewtonSafe(SolverInfo(maxEvals, lowerBoundEnforced, upperBoundEnforced, lowerBound, upperBound))
 
 # misc functions for solving
 function is_close(x::Float64, y::Float64, n::Int64 = 42)
@@ -58,7 +58,7 @@ function solve(solver::Solver1D, f::Function, accuracy::Float64, guess::Float64,
   # monotonically crescent bias, as in optionValue(volatility)
   if is_close(fxMax, 0.0)
     return root
-  else if fxMax > 0.0
+  elseif fxMax > 0.0
     xMin = enforced_bounds(solver, root - step)
     fxMin = f(xMin)
     xMax = root
@@ -80,21 +80,21 @@ function solve(solver::Solver1D, f::Function, accuracy::Float64, guess::Float64,
         return xMax
       end
       root = (xMax + xMin) / 2.0
-      return _solve(solver, f, accuracy, xMin, xMax, root, eval_num)
+      return _solve(solver, f, accuracy, xMin, xMax, fxMin, fxMax, root, eval_num)
     end
 
     if abs(fxMin) < abs(fxMax)
       xMin = enforced_bounds(solver, xMin + growth_factor * (xMin - xMax))
       fxMin = f(xMin)
-    else if abs(fxMin) > abs(fxMax)
+    elseif abs(fxMin) > abs(fxMax)
       xMax = enforced_bounds(solver, xMax + growth_factor * (xMax - xMin))
       fxMax = f(xMax)
-    else if flipflop == -1
+    elseif flipflop == -1
       xMin = enforced_bounds(solver, xMin + growth_factor * (xMin - xMax))
       fxMin = f(xMin)
       eval_num += 1
       flipflop = 1
-    else if flipflop == 1
+    elseif flipflop == 1
       xMax = enforced_bounds(solver, xMax + growth_factor * (xMax - xMin))
       fxMax = f(xMax)
       flipflop = -1
@@ -309,7 +309,7 @@ function _solve(solver::NewtonSolver, f::Function, accuracy::Float64, xMin::Floa
 
     # Convergence criterion
     if abs(dx) < accuracy
-      root = f(root) # check this
+      # root = f(root) # check this
       eval_num += 1
       return root
     end
@@ -327,7 +327,7 @@ function _solve(solver::NewtonSolver, f::Function, accuracy::Float64, xMin::Floa
   error("Maximum number of function evals exceeded!")
 end
 
-function enforced_bounds(solver::Solver1d, x::Float64)
+function enforced_bounds(solver::Solver1D, x::Float64)
   if solver.solverInfo.lowerBoundEnforced && x < solver.solverInfo.lowerBound
     return solver.solverInfo.lowerBound
   end

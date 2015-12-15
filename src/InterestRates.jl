@@ -36,7 +36,7 @@ end
 
 # private methods to calculate compound factor based on compounding type
 _compound_factor(::SimpleCompounding, rate::Float64, time_frac::Float64, ::Frequency) = 1.0 + rate * time_frac
-_compound_factor(::CompoundedCompounding, rate::Float64, time_frac::Float64, freq::Frequency) = (1.0 + rate / value(freq)) ^ (value(freq) * time_frac)
+_compound_factor(::CompoundedCompounding, rate::Float64, time_frac::Float64, freq::Frequency) = (1.0 + rate / QuantJulia.Time.value(freq)) ^ (QuantJulia.Time.value(freq) * time_frac)
 _compound_factor(::ContinuousCompounding, rate::Float64, time_frac::Float64, ::Frequency) = exp(rate * time_frac)
 _compound_factor(::SimpleThenCompounded, rate::Float64, time_frac::Float64, freq::Frequency) =
   time_frac <= 1.0 ? _compound_factor(SimpleCompounding(), rate, time_frac, freq) : _compound_factor(CompoundedCompounding(), rate, time_frac, freq)

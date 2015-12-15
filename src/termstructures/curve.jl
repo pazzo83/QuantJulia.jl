@@ -41,42 +41,59 @@ function PiecewiseYieldCurve{I}(reference_date::Date, instruments::Vector{I}, dc
   return pyc
 end
 
-type FittedBondDiscountCurve{B} <: Curve
-  settlement_days::Integer
+type FittedBondDiscountCurve{B <: Bond} <: Curve
+  settlementDays::Integer
+  referenceDate::Date
   calendar::BusinessCalendar
   bonds::Vector{B}
   dc::DayCount
   fittingMethod::FittingMethod
   accuracy::Float64
   maxEvaluations::Integer
-  guessArray::Vector{Float64}
   simplexLambda::Float64
+
+  FittedBondDiscountCurve(settlementDays::Integer,
+                          referenceDate::Date,
+                          calendar::BusinessCalendar,
+                          bonds::Vector{B},
+                          dc::DayCount,
+                          fittingMethod::FittingMethod,
+                          accuracy::Float64,
+                          maxEvaluations::Integer,
+                          simplexLambda::Float64) =
+
+                          (x = new(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda);
+                          x.fittingMethod.costFunction.curve = x)
+
+  # FittedBondDiscountCurve(settlementDays::Integer, referenceDate::Date, calendar::BusinessCalendar, bonds::Vector{B}, dc::DayCount, fittingMethod::FittingMethod, accuracy::Float64=1e-10,
+  #                                     maxEvaluations::Integer=10000, simplexLambda::Float64=1.0) =
+  #                         new(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda)
+    #n = length(bonds)
+  #   println("hi")
+  #   this = new(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda)
+  #   println("also hi")
+  #   this.fittingMethod.costFunction.curve = this
+  #
+  #   return this
+  # end
 end
 
-function FittedBondDiscountCurve{B}(settlement_days::Integer, calendar::Calendar, bonds::Vector{B}, dc::DayCount, fittingMethod::FittingMethod, accuracy::Float64=1e-10,
-                                    maxEvaluations=10000, simplexLambda::Float64=1.0)
-  n = length(bonds)
-  guessArray = Vector{Float64}(n)
-
-  fbdc = FittedBondDiscountCurve(settlement_days, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, guessArray, simplexLambda)
-  fbdc.fittingMethod.costFunction.curve = fbdc
-
-  return fbdc
-end
+FittedBondDiscountCurve{B <: Bond}(settlementDays::Integer, referenceDate::Date, calendar::BusinessCalendar, bonds::Vector{B}, dc::DayCount, fittingMethod::FittingMethod, accuracy::Float64=1e-10,
+                                     maxEvaluations::Integer=10000, simplexLambda::Float64=1.0) = FittedBondDiscountCurve{B}(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda)
 
 type FittingCost <: CostFunction
-  value::Vector{Float64}
-  values::Vector{Float64}
-  firstCashFlow::Vector{Float64}
+  # value::Vector{Float64}
+  # values::Vector{Float64}
+  firstCashFlow::Vector{Integer}
   curve::Curve
 end
 
 function FittingCost(size::Integer, curve::Curve)
-  value = Vector{Float64}()
-  values = Vector{Float64}()
-  firstCashFlow = zeros(size)
+  # value = Vector{Float64}()
+  # values = Vector{Float64}()
+  firstCashFlow = zeros(Int, size)
 
-  return FittingCost(value, values, firstCashFlow, curve)
+  return FittingCost(firstCashFlow, curve)
 end
 
 # Interpolated Curve methods #
@@ -167,8 +184,44 @@ function calculate!(curve::FittedBondDiscountCurve)
   minimize!(simplex, problem, end_criteria)
   solution = problem.currentValue
 
-  number_of_iterations = problem.
+  number_of_iterations = problem.functionEvaluation
+  cost_value = problem.functionValue
+
+  curve.fittingMethod.guessSolution = solution
+  curve.fittingMethod.numberOfIterations = number_of_iterations
+  curve.fittingMethod.minimumCostValue = cost_value
+
+  return curve
 end
 
 function value(cf::CostFunction, x::Vector{Float64})
+  ref_date = cf.curve.referenceDate
+  dc = cf.curve.dc
+  squared_error = 0.0
+  n = length(cf.curve.bonds)
+
+  for (i, bond) in enumerate(cf.curve.bonds)
+    bond_settlement = get_settlement_date(bond)
+    model_price = -accrued_amount(bond, bond_settlement)
+    leg = bond.cashflows
+    for k = cf.firstCashFlow[i]:length(leg.coupons)
+      df = discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.coupons[k])))
+      model_price += amount(leg.coupons[k]) * discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.coupons[k])))
+    end
+
+    # redemption
+    model_price += amount(leg.redemption) * discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.redemption)))
+
+    # adjust NPV for forward settlement
+    if bond_settlement != ref_date
+      model_price /= discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, bond_settlement))
+    end
+
+    market_price = bond.faceAmount
+    price_error = model_price - market_price
+    weighted_error = cf.curve.fittingMethod.weights[i] * price_error
+    squared_error += weighted_error * weighted_error
+  end
+
+  return squared_error
 end

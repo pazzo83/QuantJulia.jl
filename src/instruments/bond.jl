@@ -50,7 +50,7 @@ function notional(bond::Bond, d::Date)
 end
 
 # bond functions
-accrued_amount(bond::Bond, settlement::Date) = accrued_amount(bond.cashflows, false, settlement) * 100.0 / notional(bond, settlement)
+accrued_amount(bond::Bond, settlement::Date) = accrued_amount(bond.cashflows, settlement, false) * 100.0 / notional(bond, settlement)
 
 function yield(bond::Bond, clean_price::Float64, dc::DayCount, compounding::CompoundingType, freq::Frequency, settlement::Date, accuracy::Float64 = 1.0e-10,
               max_iter::Integer = 100, guess::Float64 = 0.05)
@@ -60,11 +60,11 @@ function yield(bond::Bond, clean_price::Float64, dc::DayCount, compounding::Comp
   return yield(bond.cashflows, dirty_price, dc, compounding, freq, false, settlement, settlement, accuracy, max_iter, guess)
 end
 
-function duration(bond::Bond, yld::InterestRate, duration::Duration, settlement_date::Date)
-  return duration(duration, bond.cashflows, yld, false, settlement_date)
+function duration(bond::Bond, yld::InterestRate, duration_::Duration, dc::DayCount, settlement_date::Date)
+  return duration(duration_, bond.cashflows, yld, dc, false, settlement_date)
 end
 
-function duration(bond::Bond, yld::Float64, dc::DayCount, compounding::CompoundingType, freq::Frequency, duration::Duration, settlement_date::Date)
+function duration(bond::Bond, yld::Float64, dc::DayCount, compounding::CompoundingType, freq::Frequency, duration_::Duration, settlement_date::Date)
   y = InterestRate(yld, dc, compounding, freq)
-  return duration(bond, y, duration, settlement_date)
+  return duration(bond, y, duration_, dc, settlement_date)
 end
