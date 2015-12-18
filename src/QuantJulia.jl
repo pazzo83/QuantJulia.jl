@@ -54,7 +54,7 @@ export
     IterativeBootstrap, initialize, calculate!, quote_error,
 
     # termstructures/nonlinear_fitting_methods.jl
-    ExponentialSplinesFitting, discount_function, guess_size,
+    ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, discount_function, guess_size,
 
     # termstructures/bond_helpers.jl
     implied_quote, clean_price, dirty_price, settlement_date,
