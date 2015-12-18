@@ -1,10 +1,10 @@
-type ExponentialSplinesFitting <: FittingMethod
+type ExponentialSplinesFitting{T} <: FittingMethod
   constrainAtZero::Bool
   solution::Vector{Float64}
   guessSolution::Vector{Float64}
   numberOfIterations::Integer
   minimumCostValue::Float64
-  weights::Vector{Float64}
+  weights::Vector{T}
   costFunction::FittingCost
 end
 
@@ -27,7 +27,7 @@ end
 
 guess_size(fitting::ExponentialSplinesFitting) = fitting.constrainAtZero ? 9 : 10
 
-function discount_function(method::ExponentialSplinesFitting, x::Vector{Float64}, t::Float64)
+function discount_function{T}(method::ExponentialSplinesFitting, x::Vector{T}, t::Float64)
   d = 0.0
   N = guess_size(method)
   kappa = x[N]

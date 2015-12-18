@@ -1,5 +1,5 @@
 # building fixed rate bonds
-include("git_repos/QuantJulia.jl/src/QuantJulia.jl")
+include("src/QuantJulia.jl")
 using QuantJulia
 
 function build_bonds(bond_mats, bond_rates, tenor, conv, rule, calendar, dc, freq, issue_date)
@@ -31,8 +31,7 @@ function get_npvs(bonds, issue_date, calendar, dc, freq)
   return npvs
 end
 
-function main()
-  # issue_date = Date(2015, 7, 1)
+function setup()
   today = now()
   issue_date = Date(Dates.Year(today), Dates.Month(today), Dates.Day(today))
   bond_mats = [issue_date + Dates.Year(i) for i in range(2, 2, 15)]
@@ -48,6 +47,12 @@ function main()
   dc = QuantJulia.Time.SimpleDayCount()
   bonds = build_bonds(bond_mats, bond_rates, tenor, conv, rule, calendar, dc, freq, issue_date)
 
+  return issue_date, bonds, dc, calendar
+end
+
+function piecewise_yld_curve()
+  issue_date, bonds, dc, calendar = setup()
+
   interp = QuantJulia.Math.LogInterpolation()
   trait = Discount()
   bootstrap = IterativeBootstrap()
@@ -58,24 +63,40 @@ function main()
   solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
   calculate!(IterativeBootstrap(), yts, solver2, solver)
 
-  return yts
+  println(yts.data)
 
   # npvs = get_npvs(bonds, issue_date, calendar, dc, freq)
 end
 
-interp = QuantJulia.Math.LogInterpolation()
-trait = Discount()
-bootstrap = IterativeBootstrap()
+function fitted_bond_curve()
+  issue_date, bonds, dc, calendar = setup()
 
-yts = PiecewiseYieldCurve(issue_date, bonds, dc, interp, trait, 0.00000000001, bootstrap)
+  esf = ExponentialSplinesFitting(true, length(bonds))
+  fitted_curve = FittedBondDiscountCurve(0, issue_date, calendar, bonds, dc, esf, 1e-10, 5000, 1.0)
+  initialize!(fitted_curve)
+  calculate!(fitted_curve)
 
-solver = QuantJulia.Math.BrentSolver()
-solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
-calculate!(IterativeBootstrap(), yts, solver2, solver)
+  # println(fitted_curve.fittingMethod.minimumCostValue)
+  # println(fitted_curve.fittingMethod.numberOfIterations)
+  # println(fitted_curve.fittingMethod.guessSolution)
 
+  disc = discount(fitted_curve, 1.0)
+  println(disc)
+end
 
-# fitted bonds
-esf = ExponentialSplinesFitting(true, length(bonds))
-fitted_curve = FittedBondDiscountCurve(0, issue_date, calendar, bonds, dc, esf, 1e-10, 5000, 1.0)
-initialize!(fitted_curve)
-calculate!(fitted_curve)
+# interp = QuantJulia.Math.LogInterpolation()
+# trait = Discount()
+# bootstrap = IterativeBootstrap()
+#
+# yts = PiecewiseYieldCurve(issue_date, bonds, dc, interp, trait, 0.00000000001, bootstrap)
+#
+# solver = QuantJulia.Math.BrentSolver()
+# solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
+# calculate!(IterativeBootstrap(), yts, solver2, solver)
+#
+#
+# # fitted bonds
+# esf = ExponentialSplinesFitting(true, length(bonds))
+# fitted_curve = FittedBondDiscountCurve(0, issue_date, calendar, bonds, dc, esf, 1e-10, 5000, 1.0)
+# initialize!(fitted_curve)
+# calculate!(fitted_curve)

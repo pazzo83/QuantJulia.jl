@@ -41,9 +41,9 @@ type EndCriteria
   gradientNormEpsilon::Float64
 end
 
-test(::NoConstraint, ::Vector{Float64}) = true
+test{T}(::NoConstraint, ::Vector{T}) = true
 
-function update(constraint::Constraint, params::Vector{Float64}, direction::Vector{Float64}, beta::Float64)
+function update{T}(constraint::Constraint, params::Vector{T}, direction::Vector{Float64}, beta::Float64)
   diff = beta
   new_params = params + diff * direction
   valid = test(constraint, new_params)
@@ -64,7 +64,7 @@ function update(constraint::Constraint, params::Vector{Float64}, direction::Vect
 end
 
 ## SIMPLEX METHODS ##
-function compute_simplex_size(vert::Vector{Vector{Float64}})
+function compute_simplex_size{T}(vert::Vector{Vector{T}})
   center = sum(vert)
   multiply_array_by_self!(center, 1 / length(vert))
 
@@ -220,7 +220,7 @@ function minimize_2!(simplex::Simplex, prob::Problem, end_criteria::EndCriteria)
   for i = 1:m
     @inbounds p[i, i] += initial_step[i]
   end
-  
+
   # Maintain a record of the value of f() at n points
   y = Array(Float64, n)
   for i = 1:n
@@ -345,13 +345,13 @@ function reset!(p::Problem)
   return p
 end
 
-function value!(p::Problem, x::Vector{Float64})
+function value!{T}(p::Problem, x::Vector{T})
   p.functionEvaluation += 1
   return QuantJulia.value(p.costFunction, x)
 end
 
-function extrapolate!(p::Problem, i_highest::Integer, factor::Float64, values::Vector{Float64}, sum_array::Vector{Float64},
-                    vertices::Vector{Vector{Float64}})
+function extrapolate!{T}(p::Problem, i_highest::Integer, factor::Float64, values::Vector{Float64}, sum_array::Vector{T},
+                    vertices::Vector{Vector{T}})
   pTry = zeros(length(sum_array))
   while true
     dimensions = length(values) - 1

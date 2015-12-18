@@ -7,7 +7,7 @@ abstract FunctionType
 type Derivative <: FunctionType end
 
 # misc functions - prob put in own file
-function divide_array_by_self!(a::Vector{Float64}, x::Number)
+function divide_array_by_self!{T}(a::Vector{T}, x::Number)
   for i = 1:length(a)
     a[i] = a[i] / x
   end
@@ -15,7 +15,7 @@ function divide_array_by_self!(a::Vector{Float64}, x::Number)
   return a
 end
 
-function multiply_array_by_self!(a::Vector{Float64}, x::Number)
+function multiply_array_by_self!{T}(a::Vector{T}, x::Number)
   for i = 1:length(a)
     a[i] = a[i] * x
   end

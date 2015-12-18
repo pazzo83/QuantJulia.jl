@@ -69,7 +69,7 @@ function initialize(::IterativeBootstrap, ts::TermStructure)
   end
 
   # initialize interpolation
-  initialize!(ts.interp, ts.times, ts.data)
+  QuantJulia.Math.initialize!(ts.interp, ts.times, ts.data)
 end
 
 function calculate!(::Bootstrap, ts::TermStructure, solver::Solver1D, first_solver::Solver1D)

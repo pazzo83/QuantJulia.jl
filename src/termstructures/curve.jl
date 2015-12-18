@@ -99,7 +99,7 @@ end
 # Interpolated Curve methods #
 max_date(curve::InterpolatedCurve) = curve.dates[end]
 
-function discount(curve::InterpolatedCurve, t::Float64)
+function discount(curve::Curve, t::Float64)
   return discount_impl(curve, t)
 end
 
@@ -123,6 +123,8 @@ end
 
 
 ### Fitted curve methods ###
+discount_impl(curve::FittedBondDiscountCurve, t::Float64) = discount_function(curve.fittingMethod, curve.fittingMethod.solution, t)
+
 function initialize!(curve::FittedBondDiscountCurve)
   # yield conventions
   dc = curve.dc
@@ -143,7 +145,7 @@ function initialize!(curve::FittedBondDiscountCurve)
     ytm = yield(bond, clean_price, dc, yield_comp, freq, bond_settlement)
     dur = duration(bond, ytm, dc, yield_comp, freq, ModifiedDuration(), bond_settlement)
 
-    curve.fittingMethod.weights[i] = 1.0 / dur
+    curve.fittingMethod.weights[i] = 1.0 / big(dur)
     squared_sum += curve.fittingMethod.weights[i] * curve.fittingMethod.weights[i]
 
     cf = bond.cashflows
@@ -182,19 +184,19 @@ function calculate!(curve::FittedBondDiscountCurve)
   end_criteria = EndCriteria(curve.maxEvaluations, max_stationary_state_iterations, root_epsilon, function_epsilon, gradient_norm_epsilon)
 
   minimize!(simplex, problem, end_criteria)
-  solution = problem.currentValue
+  curve.fittingMethod.solution = problem.currentValue
 
   number_of_iterations = problem.functionEvaluation
   cost_value = problem.functionValue
 
-  curve.fittingMethod.guessSolution = solution
+  curve.fittingMethod.guessSolution = curve.fittingMethod.solution
   curve.fittingMethod.numberOfIterations = number_of_iterations
   curve.fittingMethod.minimumCostValue = cost_value
 
   return curve
 end
 
-function value(cf::CostFunction, x::Vector{Float64})
+function value{T}(cf::CostFunction, x::Vector{T})
   ref_date = cf.curve.referenceDate
   dc = cf.curve.dc
   squared_error = 0.0
