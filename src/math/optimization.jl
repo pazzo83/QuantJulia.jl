@@ -24,7 +24,7 @@ type Problem
 end
 
 function Problem(costFunction::CostFunction, constraint::Constraint, initialValue::Vector{Float64})
-  currentValue = Vector{Float64}(length(initialValue))
+  currentValue = initialValue
   functionValue = 0.0
   squaredNorm = 0.0
   functionEvaluation = 0
@@ -69,7 +69,7 @@ function compute_simplex_size(vert::Vector{Vector{Float64}})
   multiply_array_by_self!(center, 1 / length(vert))
 
   result = 0.0
-  for i in vert
+  @inbounds for i in vert
     tmp = i - center
     result += sqrt(dot(tmp, tmp))
   end
@@ -90,15 +90,15 @@ function minimize!(simplex::Simplex, p::Problem, end_criteria::EndCriteria)
   fill!(vertices, x)
   direction = zeros(n)
   for i = 1:n
-    direction[i] = 1.0
-    vertices[i + 1] = update(p.constraint, vertices[i + 1], direction, simplex.lambda)
+    @inbounds direction[i] = 1.0
+    @inbounds vertices[i + 1] = update(p.constraint, vertices[i + 1], direction, simplex.lambda)
     # reset direction
-    direction[i] = 0.0
+    @inbounds direction[i] = 0.0
   end
   # initialize function values at the vertices of the simplex
   values = zeros(n + 1)
   for i=1:n+1
-    values[i] = value!(p, vertices[i])
+    @inbounds values[i] = value!(p, vertices[i])
   end
   # loop through looking for the minimum
   while !end_condition
@@ -117,16 +117,16 @@ function minimize!(simplex::Simplex, p::Problem, end_criteria::EndCriteria)
 
     # we might be able to just do a sort here
     for i=2:n+1
-      if values[i] > values[i_highest]
+      @inbounds if values[i] > values[i_highest]
         i_next_highest = i_highest
         i_highest = i
       else
-        if values[i] > values[i_next_highest] && i != i_highest
+        @inbounds if values[i] > values[i_next_highest] && i != i_highest
           i_next_highest = i
         end
       end
 
-      if values[i] < values[i_lowest]
+      @inbounds if values[i] < values[i_lowest]
         i_lowest = i
       end
     end
@@ -135,8 +135,8 @@ function minimize!(simplex::Simplex, p::Problem, end_criteria::EndCriteria)
     iter_num += 1
     if simplex_size < xtol || iter_num >= end_criteria.maxIterations
       ## TODO implement reason for exiting (EndResult:Type)
-      x = vertices[i_lowest]
-      low = values[i_lowest]
+      @inbounds x = vertices[i_lowest]
+      @inbounds low = values[i_lowest]
       p.functionValue = low
       p.currentValue = x
 
@@ -145,12 +145,12 @@ function minimize!(simplex::Simplex, p::Problem, end_criteria::EndCriteria)
     # if end criteria not met, continue
     factor = -1.0
     vTry = extrapolate!(p, i_highest, factor, values, sum_array, vertices)
-    if vTry <= values[i_lowest] && factor == -1.0
+    @inbounds if vTry <= values[i_lowest] && factor == -1.0
       factor = 2.0
       extrapolate!(p, i_highest, factor, values, sum_array, vertices)
     elseif abs(factor) > EPS_VAL
-      if vTry >= values[i_next_highest]
-        vSave = values[i_highest]
+      @inbounds if vTry >= values[i_next_highest]
+        @inbounds vSave = values[i_highest]
         factor = 0.5
         vTry = extrapolate!(p, i_highest, factor, values, sum_array, vertices)
         if vTry >= vSave && abs(factor) > EPS_VAL
@@ -162,8 +162,8 @@ function minimize!(simplex::Simplex, p::Problem, end_criteria::EndCriteria)
           # error("FULL STOP")
           for i = 1:n + 1
             if i != i_lowest
-              vertices[i] = 0.5 * (vertices[i] + vertices[i_lowest])
-              values[i] = value!(p, vertices[i])
+              @inbounds vertices[i] = 0.5 * (vertices[i] + vertices[i_lowest])
+              @inbounds values[i] = value!(p, vertices[i])
             end
           end
         end
@@ -220,9 +220,7 @@ function minimize_2!(simplex::Simplex, prob::Problem, end_criteria::EndCriteria)
   for i = 1:m
     @inbounds p[i, i] += initial_step[i]
   end
-
-  # count f'n calls
-
+  
   # Maintain a record of the value of f() at n points
   y = Array(Float64, n)
   for i = 1:n
@@ -265,9 +263,10 @@ function minimize_2!(simplex::Simplex, prob::Problem, end_criteria::EndCriteria)
       end
     end
 
-    for j = 1:m
-      @inbounds p_bar[j] /= m
-    end
+    # for j = 1:m
+    #   @inbounds p_bar[j] /= m
+    # end
+    divide_array_by_self!(p_bar, m)
 
     # Compute a reflection
     for j = 1:m
@@ -353,12 +352,12 @@ end
 
 function extrapolate!(p::Problem, i_highest::Integer, factor::Float64, values::Vector{Float64}, sum_array::Vector{Float64},
                     vertices::Vector{Vector{Float64}})
-  pTry = Vector{Float64}(length(sum_array))
+  pTry = zeros(length(sum_array))
   while true
     dimensions = length(values) - 1
     factor1 = (1.0 - factor) / dimensions
     factor2 = factor1 - factor
-    pTry = sum_array * factor1 - vertices[i_highest] * factor2
+    @inbounds pTry = sum_array * factor1 - vertices[i_highest] * factor2
     factor *= 0.5
 
     if test(p.constraint, pTry) || abs(factor) <= EPS_VAL
@@ -372,16 +371,16 @@ function extrapolate!(p::Problem, i_highest::Integer, factor::Float64, values::V
   factor *= 2
   vTry = value!(p, pTry) # TODO check this
   if vTry < values[i_highest]
-    values[i_highest] = vTry
-    sum_array[:] = sum_array + pTry - vertices[i_highest]
-    vertices[i_highest] = pTry
+    @inbounds values[i_highest] = vTry
+    @inbounds sum_array[:] = sum_array + pTry - vertices[i_highest]
+    @inbounds vertices[i_highest] = pTry
   end
-  if vTry == 0.02226748007400235
-    println("sum_array: $sum_array")
-    println("values: $values")
-    println("pTry: $pTry")
-    println("vertices: $vertices")
-    error("Ooops")
-  end
+  # if vTry == 0.02226748007400235
+  #   println("sum_array: $sum_array")
+  #   println("values: $values")
+  #   println("pTry: $pTry")
+  #   println("vertices: $vertices")
+  #   error("Ooops")
+  # end
   return vTry
 end

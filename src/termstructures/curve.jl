@@ -205,12 +205,12 @@ function value(cf::CostFunction, x::Vector{Float64})
     model_price = -accrued_amount(bond, bond_settlement)
     leg = bond.cashflows
     for k = cf.firstCashFlow[i]:length(leg.coupons)
-      df = discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.coupons[k])))
-      model_price += amount(leg.coupons[k]) * discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.coupons[k])))
+      # @inbounds df = discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.coupons[k])))
+      @inbounds model_price += amount(leg.coupons[k]) * discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.coupons[k])))
     end
 
     # redemption
-    model_price += amount(leg.redemption) * discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.redemption)))
+    @inbounds model_price += amount(leg.redemption) * discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.redemption)))
 
     # adjust NPV for forward settlement
     if bond_settlement != ref_date
@@ -219,7 +219,7 @@ function value(cf::CostFunction, x::Vector{Float64})
 
     market_price = bond.faceAmount
     price_error = model_price - market_price
-    weighted_error = cf.curve.fittingMethod.weights[i] * price_error
+    @inbounds weighted_error = cf.curve.fittingMethod.weights[i] * price_error
     squared_error += weighted_error * weighted_error
   end
 

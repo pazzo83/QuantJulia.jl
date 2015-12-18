@@ -39,7 +39,7 @@ export Solver1D, BrentSolver, NewtonSolver, FiniteDifferenceNewtonSafe, solve
 include("solvers.jl")
 
 # optimization.jl
-export CostFunction, Constraint, NoConstraint, OptimizationMethod, Simplex, Problem, EndCriteria, minimize!
+export CostFunction, Constraint, NoConstraint, OptimizationMethod, Simplex, Problem, EndCriteria, minimize!, minimize_2!
 
 include("optimization.jl")
 

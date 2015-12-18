@@ -34,12 +34,12 @@ function discount_function(method::ExponentialSplinesFitting, x::Vector{Float64}
   coeff = 0.0
   if !method.constrainAtZero
     for i = 1:N
-      d += x[i] * exp(-kappa * (i) * t)
+      @inbounds d += x[i] * exp(-kappa * (i) * t)
     end
   else
     for i = 1:N - 1
-      d += x[i]  * exp(-kappa * (i + 1) * t)
-      coeff += x[i]
+      @inbounds d += x[i]  * exp(-kappa * (i + 1) * t)
+      @inbounds coeff += x[i]
     end
     coeff = 1.0 - coeff
     d += coeff * exp(-kappa * t)
