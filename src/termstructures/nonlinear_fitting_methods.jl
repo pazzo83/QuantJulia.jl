@@ -56,6 +56,36 @@ function SimplePolynomialFitting(constrainAtZero::Bool, degree::Integer, size::I
   return SimplePolynomialFitting(constrainAtZero, degree, gsize, commons)
 end
 
+type NelsonSiegelFitting <: FittingMethod
+  constrainAtZero::Bool
+  size::Integer
+  commons::FittingMethodCommons
+end
+
+function NelsonSiegelFitting(size::Integer)
+  constrainAtZero = true
+  gsize = 4
+
+  commons = FittingMethodCommons(size, gsize)
+
+  return NelsonSiegelFitting(constrainAtZero, gsize, commons)
+end
+
+type SvenssonFitting <: FittingMethod
+  constrainAtZero::Bool
+  size::Integer
+  commons::FittingMethodCommons
+end
+
+function SvenssonFitting(size::Integer)
+  constrainAtZero = true
+  gsize = 6
+
+  commons = FittingMethodCommons(size, gsize)
+
+  return SvenssonFitting(constrainAtZero, gsize, commons)
+end
+
 # function ExponentialSplinesFitting(constrainAtZero::Bool, size::Integer)
 #   solution = zeros(size)
 #   if constrainAtZero
@@ -77,6 +107,7 @@ end
 guess_size(fitting::ExponentialSplinesFitting) = fitting.constrainAtZero ? 9 : 10
 guess_size(fitting::SimplePolynomialFitting) = fitting.constrainAtZero ? fitting.degree : fitting.degree + 1
 
+# Discount functions
 function discount_function{T}(method::ExponentialSplinesFitting, x::Vector{T}, t::Float64)
   d = 0.0
   N = guess_size(method)
@@ -94,5 +125,42 @@ function discount_function{T}(method::ExponentialSplinesFitting, x::Vector{T}, t
     coeff = 1.0 - coeff
     d += coeff * exp(-kappa * t)
   end
+  return d
+end
+
+function discount_function{T}(method::SimplePolynomialFitting, x::Vector{T}, t::Float64)
+  d = 0.0
+  N = method.size
+
+  if !method.constrainAtZero
+    for i = 1:N
+      @inbounds d += x[i] * get_polynomial(BernsteinPolynomial(), i-1, i-1, t)
+    end
+  else
+    d = 1.0
+    for i = 1:N
+      @inbounds d += x[i] * get_polynomial(BernsteinPolynomial(), i, i, t)
+    end
+  end
+
+  return d
+end
+
+function discount_function{T}(method::NelsonSiegelFitting, x::Vector{T}, t::Float64)
+  kappa = x[method.size]
+  zero_rate = x[1] + (x[2] + x[3]) * (1.0 - exp(-kappa * t)) / ((kappa + QuantJulia.Math.EPS_VAL) * (t + QuantJulia.Math.EPS_VAL)) - (x[3]) * exp(-kappa * t)
+  d = exp(-zero_rate * t)
+
+  return d
+end
+
+function discount_function{T}(method::SvenssonFitting, x::Vector{T}, t::Float64)
+  kappa = x[method.size - 1]
+  kappa_1 = x[method.size]
+
+  zero_rate = x[1] + (x[2] + x[3]) * (1.0 - exp(-kappa * t)) / ((kappa + QuantJulia.Math.EPS_VAL) * (t + QuantJulia.Math.EPS_VAL)) -
+              (x[3]) * exp(-kappa * t) + x[4] * (((1.0 - exp(-kappa_1 * t)) / ((kappa_1 + QuantJulia.Math.EPS_VAL) * (t + QuantJulia.Math.EPS_VAL))) - exp(-kappa_1 * t))
+
+  d = exp(-zero_rate * t)
   return d
 end
