@@ -3,7 +3,7 @@
 
 type DiscountingBondEngine <: PricingEngine end
 
-function calculate!(::DiscountingBondEngine, yts::YieldTermStructure, bond::Bond, recalculate=false)
+function calculate!(::DiscountingBondEngine, yts::YieldTermStructure, bond::Bond, recalculate::Bool=false)
   if bond.calculated && !recalculate
     return bond
   end
