@@ -167,7 +167,7 @@ function calculate!(curve::FittedBondDiscountCurve)
   cost_f = curve.fittingMethod.commons.costFunction
   constraint = NoConstraint()
 
-  x = zeros(guess_size(curve.fittingMethod))
+  x = zeros(curve.fittingMethod.size)
 
   if length(curve.fittingMethod.commons.guessSolution) > 0
     x = curve.fittingMethod.commons.guessSolution
