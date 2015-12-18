@@ -1,6 +1,6 @@
 # bond helper functions
-function implied_quote(bond::Bond, yts::YieldTermStructure, pe::PricingEngine, clean::Bool = true)
-  calculate!(pe, yts, bond, true)
+function implied_quote(bond::Bond, yts::YieldTermStructure, pe::PricingEngine, recalculate::Bool=false, clean::Bool = true)
+  calculate!(pe, yts, bond, recalculate)
   settlement_value = bond.settlementValue
   return clean ? clean_price(bond, settlement_value, settlement_date(bond)) : dirty_price(bond, settlement_value, settlement_date(bond))
 end
