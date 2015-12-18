@@ -136,4 +136,4 @@ function bootstrap_error(ts::TermStructure, i::Int64, inst::Instrument)
   return bootstrap_error_inner
 end
 
-quote_error(ts::TermStructure, inst::Instrument) = value(inst) - implied_quote(inst, ts, inst.pricing_engine)
+quote_error(ts::TermStructure, inst::Instrument) = value(inst) - implied_quote(inst, ts, inst.pricing_engine, true) # recalculate
