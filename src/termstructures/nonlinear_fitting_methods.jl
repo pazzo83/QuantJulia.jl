@@ -1,5 +1,4 @@
-type ExponentialSplinesFitting{T} <: FittingMethod
-  constrainAtZero::Bool
+type FittingMethodCommons{T}
   solution::Vector{Float64}
   guessSolution::Vector{Float64}
   numberOfIterations::Integer
@@ -8,13 +7,8 @@ type ExponentialSplinesFitting{T} <: FittingMethod
   costFunction::FittingCost
 end
 
-function ExponentialSplinesFitting(constrainAtZero::Bool, size::Integer)
+function FittingMethodCommons(size::Integer, gsize::Integer)
   solution = zeros(size)
-  if constrainAtZero
-    gsize = 9
-  else
-    gsize = 10
-  end
   guessSolution = zeros(gsize)
   numberOfIterations = 0
   minimumCostValue = 0.0
@@ -22,10 +16,66 @@ function ExponentialSplinesFitting(constrainAtZero::Bool, size::Integer)
   curve = NullCurve()
   costFunction = FittingCost(size, curve)
 
-  return ExponentialSplinesFitting(constrainAtZero, solution, guessSolution, numberOfIterations, minimumCostValue, weights, costFunction)
+  return FittingMethodCommons(solution, guessSolution, numberOfIterations, minimumCostValue, weights, costFunction)
 end
 
+type ExponentialSplinesFitting <: FittingMethod
+  constrainAtZero::Bool
+  size::Integer
+  commons::FittingMethodCommons
+end
+
+function ExponentialSplinesFitting(constrainAtZero::Bool, size::Integer)
+  if constrainAtZero
+    gsize = 9
+  else
+    gsize = 10
+  end
+
+  commons = FittingMethodCommons(size, gsize)
+
+  return ExponentialSplinesFitting(constrainAtZero, gsize, commons)
+end
+
+type SimplePolynomialFitting <: FittingMethod
+  constrainAtZero::Bool
+  degree::Integer
+  size::Integer
+  commons::FittingMethodCommons
+end
+
+function SimplePolynomialFitting(constrainAtZero::Bool, degree::Integer, size::Integer)
+  if constrainAtZero
+    gsize = degree
+  else
+    gsize = degree + 1
+  end
+
+  commons = FittingMethodCommons(size, gsize)
+
+  return SimplePolynomialFitting(constrainAtZero, degree, gsize, commons)
+end
+
+# function ExponentialSplinesFitting(constrainAtZero::Bool, size::Integer)
+#   solution = zeros(size)
+#   if constrainAtZero
+#     gsize = 9
+#   else
+#     gsize = 10
+#   end
+#   guessSolution = zeros(gsize)
+#   numberOfIterations = 0
+#   minimumCostValue = 0.0
+#   weights = zeros(size)
+#   curve = NullCurve()
+#   costFunction = FittingCost(size, curve)
+#
+#   return ExponentialSplinesFitting(constrainAtZero, gsize,
+#           FittingMethodCommons(solution, guessSolution, numberOfIterations, minimumCostValue, weights, costFunction))
+# end
+
 guess_size(fitting::ExponentialSplinesFitting) = fitting.constrainAtZero ? 9 : 10
+guess_size(fitting::SimplePolynomialFitting) = fitting.constrainAtZero ? fitting.degree : fitting.degree + 1
 
 function discount_function{T}(method::ExponentialSplinesFitting, x::Vector{T}, t::Float64)
   d = 0.0

@@ -63,7 +63,7 @@ type FittedBondDiscountCurve{B <: Bond} <: Curve
                           simplexLambda::Float64) =
 
                           (x = new(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda);
-                          x.fittingMethod.costFunction.curve = x)
+                          x.fittingMethod.commons.costFunction.curve = x)
 
   # FittedBondDiscountCurve(settlementDays::Integer, referenceDate::Date, calendar::BusinessCalendar, bonds::Vector{B}, dc::DayCount, fittingMethod::FittingMethod, accuracy::Float64=1e-10,
   #                                     maxEvaluations::Integer=10000, simplexLambda::Float64=1.0) =
@@ -123,7 +123,7 @@ end
 
 
 ### Fitted curve methods ###
-discount_impl(curve::FittedBondDiscountCurve, t::Float64) = discount_function(curve.fittingMethod, curve.fittingMethod.solution, t)
+discount_impl(curve::FittedBondDiscountCurve, t::Float64) = discount_function(curve.fittingMethod, curve.fittingMethod.commons.solution, t)
 
 function initialize!(curve::FittedBondDiscountCurve)
   # yield conventions
@@ -132,7 +132,7 @@ function initialize!(curve::FittedBondDiscountCurve)
   freq = Annual()
 
   n = length(curve.bonds)
-  cost_f = curve.fittingMethod.costFunction
+  cost_f = curve.fittingMethod.commons.costFunction
 
   squared_sum = 0.0
   for i = 1:n
@@ -145,8 +145,8 @@ function initialize!(curve::FittedBondDiscountCurve)
     ytm = yield(bond, clean_price, dc, yield_comp, freq, bond_settlement)
     dur = duration(bond, ytm, dc, yield_comp, freq, ModifiedDuration(), bond_settlement)
 
-    curve.fittingMethod.weights[i] = 1.0 / big(dur)
-    squared_sum += curve.fittingMethod.weights[i] * curve.fittingMethod.weights[i]
+    curve.fittingMethod.commons.weights[i] = 1.0 / big(dur)
+    squared_sum += curve.fittingMethod.commons.weights[i] * curve.fittingMethod.commons.weights[i]
 
     cf = bond.cashflows
     for k = 1:length(cf.coupons) + 1 # for redemption
@@ -158,19 +158,19 @@ function initialize!(curve::FittedBondDiscountCurve)
     end
   end
 
-  divide_array_by_self!(curve.fittingMethod.weights, sqrt(squared_sum))
+  divide_array_by_self!(curve.fittingMethod.commons.weights, sqrt(squared_sum))
 
   return curve
 end
 
 function calculate!(curve::FittedBondDiscountCurve)
-  cost_f = curve.fittingMethod.costFunction
+  cost_f = curve.fittingMethod.commons.costFunction
   constraint = NoConstraint()
 
   x = zeros(guess_size(curve.fittingMethod))
 
-  if length(curve.fittingMethod.guessSolution) > 0
-    x = curve.fittingMethod.guessSolution
+  if length(curve.fittingMethod.commons.guessSolution) > 0
+    x = curve.fittingMethod.commons.guessSolution
   end
 
   simplex = Simplex(curve.simplexLambda)
@@ -184,14 +184,14 @@ function calculate!(curve::FittedBondDiscountCurve)
   end_criteria = EndCriteria(curve.maxEvaluations, max_stationary_state_iterations, root_epsilon, function_epsilon, gradient_norm_epsilon)
 
   minimize!(simplex, problem, end_criteria)
-  curve.fittingMethod.solution = problem.currentValue
+  curve.fittingMethod.commons.solution = problem.currentValue
 
   number_of_iterations = problem.functionEvaluation
   cost_value = problem.functionValue
 
-  curve.fittingMethod.guessSolution = curve.fittingMethod.solution
-  curve.fittingMethod.numberOfIterations = number_of_iterations
-  curve.fittingMethod.minimumCostValue = cost_value
+  curve.fittingMethod.commons.guessSolution = curve.fittingMethod.commons.solution
+  curve.fittingMethod.commons.numberOfIterations = number_of_iterations
+  curve.fittingMethod.commons.minimumCostValue = cost_value
 
   return curve
 end
@@ -221,7 +221,7 @@ function value{T}(cf::CostFunction, x::Vector{T})
 
     market_price = bond.faceAmount
     price_error = model_price - market_price
-    @inbounds weighted_error = cf.curve.fittingMethod.weights[i] * price_error
+    @inbounds weighted_error = cf.curve.fittingMethod.commons.weights[i] * price_error
     squared_error += weighted_error * weighted_error
   end
 
