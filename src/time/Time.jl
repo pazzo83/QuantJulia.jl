@@ -8,18 +8,20 @@ export Frequency, NoFrequency, Once, Annual, Semiannual, EveryFourthMonth, Quart
 export DayCount, Actual360, Actual365, Thirty360, BondThirty360, EuroBondThirty360, ItalianThirty360, ActualActual, SimpleDayCount, day_count, days_per_year, year_fraction
 
 # BusinessCalendar.jl
-export BusinessCalendar, WesternCalendar, OrthodoxCalendar, UnitedStatesCalendar, USSettlementCalendar, USNYSECalendar, USNERCCalendar, USGovernmentBondCalendar
-
-# schedule.jl
-export BusinessDayConvention, Unadjusted, DateGenerationRule, DateGenerationForwards, DateGenerationBackwards, Schedule
+export BusinessCalendar, WesternCalendar, OrthodoxCalendar, UnitedStatesCalendar, USSettlementCalendar, USNYSECalendar, USNERCCalendar, USGovernmentBondCalendar, BusinessDayConvention, Unadjusted,
+easter_date, is_holiday, advance
 
 # tenor_period.jl
 export TenorPeriod
 
+# schedule.jl
+export DateGenerationRule, DateGenerationForwards, DateGenerationBackwards, Schedule
+
+
 include("Frequency.jl")
 include("DayCount.jl")
 include("BusinessCalendar.jl")
-include("schedule.jl")
 include("tenor_period.jl")
+include("schedule.jl")
 
 end

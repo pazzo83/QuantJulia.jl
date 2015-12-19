@@ -86,6 +86,37 @@ function SvenssonFitting(size::Integer)
   return SvenssonFitting(constrainAtZero, gsize, commons)
 end
 
+type CubicBSplinesFitting <: FittingMethod
+  constrainAtZero::Bool
+  size::Integer
+  knots::Vector{Float64}
+  splines::BSpline
+  N::Integer
+  commons::FittingMethodCommons
+
+  function CubicBSplinesFitting(constrainAtZero::Bool, knots::Vector{Float64}, size::Integer)
+    m = length(knots)
+    m >= 8 || error("At least 8 knots are required")
+
+    splines = BSpline(3, m - 4, knots)
+    basis_functions = m - 4
+    if constrainAtZero
+      gsize = basis_functions - 1
+
+      N = 2
+      abs(spline_oper(splines, N, 0.0) > QuantJulia.Math.EPS_VAL) || error("N_th cubic B-spline must be nonzero at t=0")
+    else
+      gsize = basis_functions
+      N = 1
+    end
+
+    commons = FittingMethodCommons(size, gsize)
+
+    new(constrainAtZero, gsize, knots, splines, N, commons)
+  end
+end
+
+
 # function ExponentialSplinesFitting(constrainAtZero::Bool, size::Integer)
 #   solution = zeros(size)
 #   if constrainAtZero
@@ -148,7 +179,7 @@ end
 
 function discount_function{T}(method::NelsonSiegelFitting, x::Vector{T}, t::Float64)
   kappa = x[method.size]
-  zero_rate = x[1] + (x[2] + x[3]) * (1.0 - exp(-kappa * t)) / ((kappa + QuantJulia.Math.EPS_VAL) * (t + QuantJulia.Math.EPS_VAL)) - (x[3]) * exp(-kappa * t)
+  @inbounds zero_rate = x[1] + (x[2] + x[3]) * (1.0 - exp(-kappa * t)) / ((kappa + QuantJulia.Math.EPS_VAL) * (t + QuantJulia.Math.EPS_VAL)) - (x[3]) * exp(-kappa * t)
   d = exp(-zero_rate * t)
 
   return d
@@ -157,10 +188,36 @@ end
 function discount_function{T}(method::SvenssonFitting, x::Vector{T}, t::Float64)
   kappa = x[method.size - 1]
   kappa_1 = x[method.size]
+  eps_v = QuantJulia.Math.EPS_VAL
 
-  zero_rate = x[1] + (x[2] + x[3]) * (1.0 - exp(-kappa * t)) / ((kappa + QuantJulia.Math.EPS_VAL) * (t + QuantJulia.Math.EPS_VAL)) -
-              (x[3]) * exp(-kappa * t) + x[4] * (((1.0 - exp(-kappa_1 * t)) / ((kappa_1 + QuantJulia.Math.EPS_VAL) * (t + QuantJulia.Math.EPS_VAL))) - exp(-kappa_1 * t))
+  zero_rate = x[1] + (x[2] + x[3]) * (1.0 - exp(-kappa * t)) / ((kappa + eps_v) * (t + eps_v)) - (x[3]) * exp(-kappa * t) + x[4] * (((1.0 - exp(-kappa_1 * t)) / ((kappa_1 + eps_v) * (t + eps_v))) - exp(-kappa_1 * t))
 
   d = exp(-zero_rate * t)
+  return d
+end
+
+function discount_function{T}(method::CubicBSplinesFitting, x::Vector{T}, t::Float64)
+  d = 0.0
+  if !method.constrainAtZero
+    for i = 1:method.size
+      @inbounds d += x[i] * spline_oper(method.splines, i, t)
+    end
+  else
+    t_star = 0.0
+    sum = 0.0
+    for i = 1:method.size
+      if i < method.N
+        @inbounds d += x[i] * spline_oper(method.splines, i, t)
+        @inbounds sum += x[i] * spline_oper(method.splines, i, t_star)
+      else
+        @inbounds d += x[i] * spline_oper(method.splines, i + 1, t)
+        @inbounds sum += x[i] * spline_oper(method.splines, i + 1, t_star)
+      end
+    end
+    coeff = 1.0 - sum
+    coeff /= spline_oper(method.splines, method.N, t_star)
+    d += coeff * spline_oper(method.splines, method.N, t)
+  end
+
   return d
 end

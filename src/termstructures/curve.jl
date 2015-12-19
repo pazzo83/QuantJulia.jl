@@ -5,7 +5,7 @@ using QuantJulia.Math, QuantJulia.Time
 type NullCurve <: Curve end
 
 type PiecewiseYieldCurve{I} <: InterpolatedCurve{I}
-  reference_date::Date
+  referenceDate::Date
   instruments::Vector{I}
   dc::DayCount
   interp::Interpolation
@@ -16,14 +16,15 @@ type PiecewiseYieldCurve{I} <: InterpolatedCurve{I}
   data::Vector{Float64}
   errors::Vector{Function}
   validCurve::Bool
+  calculated::Bool
 end
 
-function PiecewiseYieldCurve{I}(reference_date::Date, instruments::Vector{I}, dc::DayCount, interp::Interpolation, trait::BootstrapTrait,
+function PiecewiseYieldCurve{I}(referenceDate::Date, instruments::Vector{I}, dc::DayCount, interp::Interpolation, trait::BootstrapTrait,
                                 accuracy::Float64, boot::Bootstrap)
   # get the initial length of instruments
   n = length(instruments)
   # create an initial state of the curve
-  pyc = PiecewiseYieldCurve(reference_date,
+  pyc = PiecewiseYieldCurve(referenceDate,
                             instruments,
                             dc,
                             interp,
@@ -33,6 +34,7 @@ function PiecewiseYieldCurve{I}(reference_date::Date, instruments::Vector{I}, dc
                             Vector{Float64}(n + 1),
                             Vector{Float64}(n + 1),
                             Vector{Function}(n + 1),
+                            false,
                             false)
 
   # initialize the bootstrapping
@@ -51,6 +53,7 @@ type FittedBondDiscountCurve{B <: Bond} <: Curve
   accuracy::Float64
   maxEvaluations::Integer
   simplexLambda::Float64
+  calculated::Bool
 
   FittedBondDiscountCurve(settlementDays::Integer,
                           referenceDate::Date,
@@ -62,7 +65,7 @@ type FittedBondDiscountCurve{B <: Bond} <: Curve
                           maxEvaluations::Integer,
                           simplexLambda::Float64) =
 
-                          (x = new(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda);
+                          (x = new(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda, false);
                           x.fittingMethod.commons.costFunction.curve = x)
 
   # FittedBondDiscountCurve(settlementDays::Integer, referenceDate::Date, calendar::BusinessCalendar, bonds::Vector{B}, dc::DayCount, fittingMethod::FittingMethod, accuracy::Float64=1e-10,
@@ -79,7 +82,8 @@ type FittedBondDiscountCurve{B <: Bond} <: Curve
 end
 
 FittedBondDiscountCurve{B <: Bond}(settlementDays::Integer, referenceDate::Date, calendar::BusinessCalendar, bonds::Vector{B}, dc::DayCount, fittingMethod::FittingMethod, accuracy::Float64=1e-10,
-                                     maxEvaluations::Integer=10000, simplexLambda::Float64=1.0) = FittedBondDiscountCurve{B}(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda)
+                                     maxEvaluations::Integer=10000, simplexLambda::Float64=1.0) =
+                                     FittedBondDiscountCurve{B}(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda)
 
 type FittingCost <: CostFunction
   # value::Vector{Float64}
@@ -115,9 +119,9 @@ function discount_impl(curve::InterpolatedCurve, t::Float64)
   # do flat fwd extrapolation
 end
 
-function calculate!(curve::InterpolatedCurve)
+function _calculate!(curve::InterpolatedCurve)
   calculate!(curve.boot)
-
+  curve.calculated = true
   return curve
 end
 
@@ -163,7 +167,7 @@ function initialize!(curve::FittedBondDiscountCurve)
   return curve
 end
 
-function calculate!(curve::FittedBondDiscountCurve)
+function _calculate!(curve::FittedBondDiscountCurve)
   cost_f = curve.fittingMethod.commons.costFunction
   constraint = NoConstraint()
 
@@ -192,6 +196,9 @@ function calculate!(curve::FittedBondDiscountCurve)
   curve.fittingMethod.commons.guessSolution = curve.fittingMethod.commons.solution
   curve.fittingMethod.commons.numberOfIterations = number_of_iterations
   curve.fittingMethod.commons.minimumCostValue = cost_value
+
+  # we have calculated
+  curve.calculated = true
 
   return curve
 end

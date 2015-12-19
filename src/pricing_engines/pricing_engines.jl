@@ -8,7 +8,7 @@ function calculate!(::DiscountingBondEngine, yts::YieldTermStructure, bond::Bond
     return bond
   end
 
-  valuation_date = yts.reference_date
+  valuation_date = yts.referenceDate
   value = npv(bond.cashflows, yts, valuation_date, valuation_date)
   bond.settlementValue = value
   bond.calculated = true

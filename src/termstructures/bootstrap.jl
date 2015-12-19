@@ -62,10 +62,10 @@ function initialize(::IterativeBootstrap, ts::TermStructure)
   end
 
   # build times and error vectors (which have the functions for the solver)
-  ts.times[1] = time_from_reference(ts, ts.reference_date)
+  ts.times[1] = time_from_reference(ts, ts.referenceDate)
   for i = 2:n
-    ts.times[i] = time_from_reference(ts, ts.instruments[i - 1].maturityDate)
-    ts.errors[i] = bootstrap_error(ts, i, ts.instruments[i - 1])
+    @inbounds ts.times[i] = time_from_reference(ts, ts.instruments[i - 1].maturityDate)
+    @inbounds ts.errors[i] = bootstrap_error(ts, i, ts.instruments[i - 1])
   end
 
   # initialize interpolation

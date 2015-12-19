@@ -41,6 +41,29 @@ end
 
 export divide_array_by_self!, multiply_array_by_self!, get_factorial, get_polynomial, FunctionType, Derivative, BernsteinPolynomial
 
+# Splines
+type BSpline
+  p::Integer
+  n::Integer
+  knots::Vector{Float64}
+end
+
+function spline_oper(spline::BSpline, i::Integer, x::Float64)
+  i <= spline.n || error("i must not be greater than spline.n $i $(spline.n)")
+  return N(spline, i, spline.p, x)
+end
+
+function N(spline::BSpline, i::Integer, p::Integer, x::Float64)
+  if p == 0
+    return (spline.knots[i] <= x && x < spline.knots[i + 1]) ? 1.0 : 0.0
+  else
+    return ((x - spline.knots[i]) / (spline.knots[i + p] - spline.knots[i])) * N(spline, i, p - 1, x) +
+            ((spline.knots[i + p + 1] - x) / (spline.knots[i + p + 1] - spline.knots[i + 1])) * N(spline, i + 1, p - 1, x)
+  end
+end
+
+export BSpline, spline_oper, N
+
 # Constants
 const EPS_VAL = eps()
 

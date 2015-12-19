@@ -1,9 +1,3 @@
-include("Frequency.jl")
-include("tenor_period.jl")
-# types we need now that might be moved
-abstract BusinessDayConvention
-type Unadjusted <: BusinessDayConvention end
-
 abstract DateGenerationRule
 type DateGenerationBackwards <: DateGenerationRule end
 type DateGenerationForwards <: DateGenerationRule end

@@ -47,7 +47,7 @@ type FixedRateLeg <: Leg
     end_date = count == length(schedule.dates) ? schedule.dates[end] : schedule.dates[count + 1]
 
     while start_date < schedule.dates[end]
-      coups[count] = FixedRateCoupon(end_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date)
+      @inbounds coups[count] = FixedRateCoupon(end_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date)
 
       count += 1
       start_date = end_date
@@ -99,8 +99,8 @@ function npv(leg::Leg, yts::YieldTermStructure, settlement_date::Date, npv_date:
 
   for i in leg
     #TODO: check has occurred
-    if date(i) > settlement_date
-      totalNPV += amount(i) * discount(yts, date(i))
+    @inbounds if date(i) > settlement_date
+      @inbounds totalNPV += amount(i) * discount(yts, date(i))
     end
   end
 

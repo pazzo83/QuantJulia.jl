@@ -100,6 +100,8 @@ function minimize!(simplex::Simplex, p::Problem, end_criteria::EndCriteria)
   for i=1:n+1
     @inbounds values[i] = value!(p, vertices[i])
   end
+
+  sum_array = zeros(n + 1)
   # loop through looking for the minimum
   while !end_condition
     # sum_array = zeros(n)

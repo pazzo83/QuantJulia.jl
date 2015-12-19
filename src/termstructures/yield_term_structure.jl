@@ -3,16 +3,24 @@ using QuantJulia.Time
 
 # core TermStructure methods
 function check_range(ts::TermStructure, date::Date)
-  date < ts.reference_date && "Date $date before reference_date $(ts.reference_date)"
+  date < ts.referenceDate && "Date $date before reference_date $(ts.referenceDate)"
 end
 
 function check_range(ts::TermStructure, time_frac::Float64)
   time_frac < 0.0 && "Negative time given: $time"
 end
 
-max_date(ts) = ts.reference_date + Date.Year(100)
+max_date(ts) = ts.referenceDate + Date.Year(100)
 
-time_from_reference(ts::TermStructure, date::Date) = year_fraction(ts.dc, ts.reference_date, date)
+time_from_reference(ts::TermStructure, date::Date) = year_fraction(ts.dc, ts.referenceDate, date)
+
+function calculate!(ts::TermStructure, recalculate::Bool=false)
+  if !ts.calculated || recalculate
+    _calculate!(ts)
+  end
+
+  return ts
+end
 
 type JumpDate
   ts_quote::Quote
@@ -45,7 +53,7 @@ function discount(yts::YieldTermStructure, time_frac::Float64)
 end
 
 function zero_rate(yts::YieldTermStructure, date::Date, dc::DayCount, comp::CompoundingType, freq::Frequency)
-  if date == yts.reference_date
+  if date == yts.referenceDate
     return implied_rate(1.0 / discount(yts, 0.0001), dc, comp, 0.0001, freq)
   else
     return implied_rate(1.0 / discount(yts, date), dc, comp, date, freq)
@@ -86,7 +94,7 @@ end
 ## FlatForwardTermStructure
 type FlatForwardTermStructure <: YieldTermStructure
   settlement_days::Integer
-  reference_date::Date
+  referenceDate::Date
   calendar::BusinessCalendar
   forward::Quote
   dc::DayCount
@@ -94,9 +102,9 @@ type FlatForwardTermStructure <: YieldTermStructure
   freq::Frequency
   rate::InterestRate
 
-  function FlatForwardTermStructure(settlement_days::Integer, reference_date::Date, calendar::BusinessCalendar, forward::Quote, dc::DayCount, comp::CompoundingType, freq::Frequency)
+  function FlatForwardTermStructure(settlement_days::Integer, referenceDate::Date, calendar::BusinessCalendar, forward::Quote, dc::DayCount, comp::CompoundingType, freq::Frequency)
     rate = InterestRate(forward.value, dc, comp, freq)
-    new(settlement_days, reference_date, calendar, forward, dc, comp, freq, rate)
+    new(settlement_days, referenceDate, calendar, forward, dc, comp, freq, rate)
   end
 end
 

@@ -43,7 +43,7 @@ export
 
     # termstructures/yield_term_structure.jl
     FlatForwardTermStructure, JumpDate, JumpTime,
-    check_range, max_date, time_from_reference, discount, zero_rate, forward_rate, discount_impl,
+    calculated!, check_range, max_date, time_from_reference, discount, zero_rate, forward_rate, discount_impl,
 
     # termstructures/curve.jl
     PiecewiseYieldCurve, FittedBondDiscountCurve, FittingCost, NullCurve,
@@ -51,10 +51,10 @@ export
 
     # termstructures/bootstrap.jl
     Discount, guess, min_value_after, max_value_after,
-    IterativeBootstrap, initialize, calculate!, quote_error,
+    IterativeBootstrap, initialize, quote_error,
 
     # termstructures/nonlinear_fitting_methods.jl
-    ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, discount_function, guess_size,
+    ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, CubicBSplinesFitting, discount_function, guess_size,
 
     # termstructures/bond_helpers.jl
     implied_quote, clean_price, dirty_price, settlement_date,
