@@ -1,6 +1,7 @@
 # Instruments
 abstract Instrument
 abstract Bond <: Instrument
+abstract AbstractRate <: Instrument
 
 # Term Structures
 abstract TermStructure
@@ -19,3 +20,9 @@ abstract CashFlows
 abstract CashFlow
 abstract Coupon <: CashFlow
 abstract Duration
+
+# Indexes
+abstract InterestRateIndex
+
+# Currencies
+abstract AbstractCurrency

@@ -1,6 +1,8 @@
+# using FloatFloat
+
 type FittingMethodCommons{T}
-  solution::Vector{Float64}
-  guessSolution::Vector{Float64}
+  solution::Vector{T}
+  guessSolution::Vector{T}
   numberOfIterations::Integer
   minimumCostValue::Float64
   weights::Vector{T}
@@ -9,10 +11,13 @@ end
 
 function FittingMethodCommons(size::Integer, gsize::Integer)
   solution = zeros(size)
+  # solution = Vector{DD}(size)
   guessSolution = zeros(gsize)
+  # guessSolution = Vector{DD}(gsize)
   numberOfIterations = 0
   minimumCostValue = 0.0
   weights = zeros(size)
+  # weights = Vector{DD}(size)
   curve = NullCurve()
   costFunction = FittingCost(size, curve)
 

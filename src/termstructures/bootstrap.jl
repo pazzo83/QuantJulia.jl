@@ -75,6 +75,7 @@ end
 function calculate!(::Bootstrap, ts::TermStructure, solver::Solver1D, first_solver::Solver1D)
   max_iter = max_iterations(ts.trait)
   valid_data = ts.validCurve
+  ts.calculated = true
 
   iterations = 0
   # if we get through this loop, we haven't converged
@@ -136,4 +137,5 @@ function bootstrap_error(ts::TermStructure, i::Int64, inst::Instrument)
   return bootstrap_error_inner
 end
 
-quote_error(ts::TermStructure, inst::Instrument) = value(inst) - implied_quote(inst, ts, inst.pricing_engine, true) # recalculate
+quote_error(ts::TermStructure, inst::Bond) = QuantJulia.value(inst) - implied_quote(inst, ts, inst.pricing_engine, true) # recalculate
+quote_error(ts::TermStructure, rate::AbstractRate) = rate.rate.value - implied_quote(rate, ts)

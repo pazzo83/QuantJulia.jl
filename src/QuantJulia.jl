@@ -32,14 +32,21 @@ include("math/Math.jl")
 export
     # abstract_types.jl
     CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap,
-    FittingMethod, CashFlows, CashFlow, Coupon, Instrument, Bond, PricingEngine, Duration,
+    FittingMethod, CashFlows, CashFlow, Coupon, Instrument, Bond, PricingEngine, Duration, RateHelper,
+    InterestRateIndex, AbstractCurrency,
 
-    # quotes/Quotes/jl
+    # quotes/Quotes.jl
     Quote,
+
+    # currencies/currencies.jl
+    NullCurrency, Currency,
 
     # InterestRates.jl
     ContinuousCompounding, SimpleCompounding, CompoundedCompounding, SimpleThenCompounded, ModifiedDuration,
     InterestRate, discount_factor, compound_factor, equivalent_rate, implied_rate,
+
+    # Indexes
+    IborIndex, fixing_date, maturity_date, fixing, forecast_fixing,
 
     # termstructures/yield_term_structure.jl
     FlatForwardTermStructure, JumpDate, JumpTime,
@@ -56,15 +63,20 @@ export
     # termstructures/nonlinear_fitting_methods.jl
     ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, CubicBSplinesFitting, discount_function, guess_size,
 
-    # termstructures/bond_helpers.jl
-    implied_quote, clean_price, dirty_price, settlement_date,
-
     # cash_flows/cash_flows.jl
     SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
     accrual_days, accrual_days, next_cashflow, has_occurred,
 
     # instruments/bond.jl
     FixedRateBond, value, get_settlement_date, notional, accrued_amount, yield, duration,
+    # instruments/rate.jl
+    DepositRate,
+
+    # termstructures/bond_helpers.jl
+    implied_quote, clean_price, dirty_price, settlement_date,
+
+    # termstructures/rate_helpers.jl
+    implied_quote,
 
     # pricing_engines/pricing_engines.jl
     DiscountingBondEngine, calculate
@@ -75,8 +87,14 @@ include("abstract_types.jl")
 # Quotes ----------------------------
 include("quotes/Quotes.jl")
 
+# Currencies -----------------------
+include("currencies/currencies.jl")
+
 # Interest Rates ---------------------------------
 include("InterestRates.jl")
+
+# Indexes
+include("indexes/indexes.jl")
 
 # Term Structures -----------------------------------
 # yield term structures
@@ -85,10 +103,6 @@ include("termstructures/yield_term_structure.jl")
 include("termstructures/curve.jl")
 # bootstrapping
 include("termstructures/bootstrap.jl")
-# helpers
-include("termstructures/bond_helpers.jl")
-# nonlinear fitting methods
-include("termstructures/nonlinear_fitting_methods.jl")
 
 # Cash Flows ------------------------------------
 include("cash_flows/cash_flows.jl")
@@ -96,6 +110,14 @@ include("cash_flows/cash_flows.jl")
 # Instruments ------------------------
 # bond
 include("instruments/bond.jl")
+include("instruments/rate.jl")
+
+# helpers
+include("termstructures/bond_helpers.jl")
+include("termstructures/rate_helpers.jl")
+
+# nonlinear fitting methods
+include("termstructures/nonlinear_fitting_methods.jl")
 
 # Pricing Engines ------------------------
 include("pricing_engines/pricing_engines.jl")

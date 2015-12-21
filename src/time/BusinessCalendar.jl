@@ -16,6 +16,7 @@ type USGovernmentBondCalendar <: UnitedStatesCalendar; end
 
 abstract BusinessDayConvention
 type Unadjusted <: BusinessDayConvention end
+type ModifiedFollowing <: BusinessDayConvention end
 
 # easter functions
 function easter_rata(y::Integer)
@@ -77,6 +78,12 @@ function advance(days::Day, cal::BusinessCalendar, dt::Date, biz_conv::BusinessD
 
   return dt
 end
+
+function advance(months::Month, cal::BusinessCalendar, dt::Date, biz_conv::BusinessDayConvention)
+  dt += months
+  return adjust(cal, biz_conv, dt)
+end
+
 
 function is_business_day(cal::BusinessCalendar, dt::Date)
   if dayofweek(dt) in [6, 7] || is_holiday(cal, dt)
@@ -191,4 +198,15 @@ function is_holiday(::USGovernmentBondCalendar, dt::Date)
 	end
 
 	return false
+end
+
+# adjustments
+adjust(::BusinessCalendar, ::Unadjusted, d::Date) = d
+
+function adjust(cal::BusinessCalendar, ::ModifiedFollowing, d::Date)
+  while !is_business_day(cal, d)
+    d += Day(1)
+  end
+
+  return d
 end

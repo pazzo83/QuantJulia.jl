@@ -2,7 +2,8 @@
 include("src/QuantJulia.jl")
 using QuantJulia
 
-function build_bonds(bond_mats, bond_rates, tenor, conv, rule, calendar, dc, freq, issue_date)
+function build_bonds(bond_mats::Vector{Date}, bond_rates::Vector{Float64}, tenor::QuantJulia.Time.TenorPeriod, conv::QuantJulia.Time.BusinessDayConvention,
+                    rule::QuantJulia.Time.DateGenerationRule, calendar::QuantJulia.Time.BusinessCalendar, dc::QuantJulia.Time.DayCount, freq::QuantJulia.Time.Frequency, issue_date::Date)
   bonds = Vector{FixedRateBond}(length(bond_mats))
   pricing_engine = DiscountingBondEngine()
 
@@ -16,6 +17,17 @@ function build_bonds(bond_mats, bond_rates, tenor, conv, rule, calendar, dc, fre
   end
 
   return bonds
+end
+
+function build_depos(depo_quotes::Vector{Float64}, depo_tenors::Vector{Base.Dates.Period}, dc::QuantJulia.Time.DayCount, conv::QuantJulia.Time.BusinessDayConvention,
+                    calendar::QuantJulia.Time.BusinessCalendar, fixing_days::Integer)
+  depos = Vector{DepositRate}(length(depo_quotes))
+  for i = 1:length(depo_quotes)
+    depo_quote = Quote(depo_quotes[i])
+    depo_tenor = depo_tenors[i]
+    depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv, true, dc)
+    depos[i] = depo
+  end
 end
 
 function get_npvs(bonds, issue_date, calendar, dc, freq)
@@ -97,9 +109,9 @@ function fitted_bond_curve_exp()
   initialize!(fitted_curve)
   calculate!(fitted_curve)
 
-  # println(fitted_curve.fittingMethod.minimumCostValue)
+  println(fitted_curve.fittingMethod.commons.minimumCostValue)
   println(fitted_curve.fittingMethod.commons.numberOfIterations)
-  # println(fitted_curve.fittingMethod.guessSolution)
+  println(fitted_curve.fittingMethod.commons.guessSolution)
 
   disc = discount(fitted_curve, 1.0)
   println(disc)
@@ -285,20 +297,49 @@ function main()
   end
 end
 
+function main2()
+  settlement_date = Date(2008, 9, 18)
+  set_eval_date!(settings, settlement_date)
+  freq = QuantJulia.Time.Semiannual()
+  tenor = QuantJulia.Time.TenorPeriod(freq)
+  conv = QuantJulia.Time.Unadjusted()
+  conv_depo = QuantJulia.Time.ModifiedFollowing()
+  rule = QuantJulia.Time.DateGenerationBackwards()
+  calendar = QuantJulia.Time.USGovernmentBondCalendar()
+  dc = QuantJulia.Time.Actual365()
+  fixing_days = 3
 
-# interp = QuantJulia.Math.LogInterpolation()
-# trait = Discount()
-# bootstrap = IterativeBootstrap()
-#
-# yts = PiecewiseYieldCurve(issue_date, bonds, dc, interp, trait, 0.00000000001, bootstrap)
-#
-# solver = QuantJulia.Math.BrentSolver()
-# solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
-# calculate!(IterativeBootstrap(), yts, solver2, solver)
-#
-#
-# # fitted bonds
-# esf = ExponentialSplinesFitting(true, length(bonds))
-# fitted_curve = FittedBondDiscountCurve(0, issue_date, calendar, bonds, dc, esf, 1e-10, 5000, 1.0)
-# initialize!(fitted_curve)
-# calculate!(fitted_curve)
+  # build depos
+  depo_rates = [0.0096, 0.0145, 0.0194]
+  depo_tens = [Base.Dates.Month(3), Base.Dates.Month(6), Base.Dates.Month(12)]
+
+  # build bonds
+  issue_dates = [Date(2005, 3, 15), Date(2005, 6, 15), Date(2006, 6, 30), Date(2002, 11, 15), Date(1987, 5, 15)]
+  mat_dates = [Date(2010, 8, 31), Date(2011, 8, 31), Date(2013, 8, 31), Date(2018, 8, 15), Date(2038, 5, 15)]
+
+  coupon_rates = [0.02375, 0.04625, 0.03125, 0.04000, 0.04500]
+  market_quotes = [100.390625, 106.21875, 100.59375, 101.6875, 102.140625]
+
+  insts = Vector{Instrument}(length(depo_rates) + length(issue_dates))
+  for i = 1:length(depo_rates)
+    depo_quote = Quote(depo_rates[i])
+    depo_tenor = depo_tens[i]
+    depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv_depo, true, dc)
+    insts[i] = depo
+  end
+
+  pricing_engine = DiscountingBondEngine()
+
+  for i =1:length(coupon_rates)
+    term_date = mat_dates[i]
+    # rate = bond_rates[i] / 100
+    rate = coupon_rates[i]
+    issue_date = issue_dates[i]
+    market_quote = market_quotes[i]
+    sched = QuantJulia.Time.Schedule(issue_date, term_date, tenor, conv, conv, rule, true)
+    bond = FixedRateBond(0, market_quote, sched, rate, dc, conv, 100.0, issue_date, calendar, pricing_engine)
+    insts[i + length(depo_rates)] = bond
+  end
+
+  return insts
+end

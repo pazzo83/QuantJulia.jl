@@ -172,6 +172,7 @@ function _calculate!(curve::FittedBondDiscountCurve)
   constraint = NoConstraint()
 
   x = zeros(curve.fittingMethod.size)
+  # x = Vector{DD}(curve.fittingMethod.size)
 
   if length(curve.fittingMethod.commons.guessSolution) > 0
     x = curve.fittingMethod.commons.guessSolution

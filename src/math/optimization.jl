@@ -1,4 +1,4 @@
-using QuantJulia
+using QuantJulia, FloatFloat
 
 abstract CostFunction
 
@@ -12,18 +12,18 @@ type Simplex <: OptimizationMethod
   lambda::Float64
 end
 
-type Problem
+type Problem{T}
   costFunction::CostFunction
   constraint::Constraint
-  initialValue::Vector{Float64}
-  currentValue::Vector{Float64}
+  initialValue::Vector{T}
+  currentValue::Vector{T}
   functionValue::Float64
   squaredNorm::Float64
   functionEvaluation::Integer
   gradientEvaluation::Integer
 end
 
-function Problem(costFunction::CostFunction, constraint::Constraint, initialValue::Vector{Float64})
+function Problem{T}(costFunction::CostFunction, constraint::Constraint, initialValue::Vector{T})
   currentValue = initialValue
   functionValue = 0.0
   squaredNorm = 0.0
@@ -97,11 +97,13 @@ function minimize!(simplex::Simplex, p::Problem, end_criteria::EndCriteria)
   end
   # initialize function values at the vertices of the simplex
   values = zeros(n + 1)
+  # values = Vector{DD}(n + 1)
   for i=1:n+1
     @inbounds values[i] = value!(p, vertices[i])
   end
 
   sum_array = zeros(n + 1)
+  # sum_array = Vector{DD}(n + 1)
   # loop through looking for the minimum
   while !end_condition
     # sum_array = zeros(n)
@@ -352,7 +354,7 @@ function value!{T}(p::Problem, x::Vector{T})
   return QuantJulia.value(p.costFunction, x)
 end
 
-function extrapolate!{T}(p::Problem, i_highest::Integer, factor::Float64, values::Vector{Float64}, sum_array::Vector{T},
+function extrapolate!{T}(p::Problem, i_highest::Integer, factor::Float64, values::Vector{T}, sum_array::Vector{T},
                     vertices::Vector{Vector{T}})
   pTry = zeros(length(sum_array))
   while true
