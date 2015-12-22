@@ -11,10 +11,10 @@ dirty_price(bond::Bond, settlement_value::Float64, settlement_date::Date) = sett
 
 function settlement_date(bond::Bond, d::Date = Date())
   if d == Date()
-    return settings.evaluation_date
+    d = settings.evaluation_date
   end
 
-  return d + bond.settlementDays
+  return d + Base.Dates.Day(bond.settlementDays)
 end
 
 function accrued_amount(bond::Bond, settlement_date::Date)

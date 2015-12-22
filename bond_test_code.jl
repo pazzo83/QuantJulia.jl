@@ -299,14 +299,16 @@ end
 
 function main2()
   settlement_date = Date(2008, 9, 18)
-  set_eval_date!(settings, settlement_date)
+  set_eval_date!(settings, settlement_date - Base.Dates.Day(3))
   freq = QuantJulia.Time.Semiannual()
   tenor = QuantJulia.Time.TenorPeriod(freq)
   conv = QuantJulia.Time.Unadjusted()
   conv_depo = QuantJulia.Time.ModifiedFollowing()
   rule = QuantJulia.Time.DateGenerationBackwards()
   calendar = QuantJulia.Time.USGovernmentBondCalendar()
-  dc = QuantJulia.Time.Actual365()
+  dc_depo = QuantJulia.Time.Actual365()
+  dc = QuantJulia.Time.ISDAActualActual()
+  dc_bond = QuantJulia.Time.ISMAActualActual()
   fixing_days = 3
 
   # build depos
@@ -324,7 +326,7 @@ function main2()
   for i = 1:length(depo_rates)
     depo_quote = Quote(depo_rates[i])
     depo_tenor = depo_tens[i]
-    depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv_depo, true, dc)
+    depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv_depo, true, dc_depo)
     insts[i] = depo
   end
 
@@ -337,9 +339,26 @@ function main2()
     issue_date = issue_dates[i]
     market_quote = market_quotes[i]
     sched = QuantJulia.Time.Schedule(issue_date, term_date, tenor, conv, conv, rule, true)
-    bond = FixedRateBond(0, market_quote, sched, rate, dc, conv, 100.0, issue_date, calendar, pricing_engine)
+    bond = FixedRateBond(Quote(market_quote), 3, 100.0, sched, rate, dc_bond, conv, 100.0, issue_date, calendar, pricing_engine)
     insts[i + length(depo_rates)] = bond
   end
 
-  return insts
+  interp = QuantJulia.Math.LogInterpolation()
+  trait = Discount()
+  bootstrap = IterativeBootstrap()
+
+  yts = PiecewiseYieldCurve(settlement_date, insts, dc, interp, trait, 0.00000000001, bootstrap)
+
+  solver = QuantJulia.Math.BrentSolver()
+  solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
+  calculate!(bootstrap, yts, solver2, solver)
+
+  println(yts.data)
+
+  # build zero coupon bond
+  zcb = ZeroCouponBond(3, calendar, 100.0, Date(2013, 8, 15), QuantJulia.Time.Following(), 116.92, Date(2003, 8, 15))
+
+  NPV = npv(zcb, pricing_engine, yts)
+
+  println(NPV)
 end

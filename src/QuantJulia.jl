@@ -64,11 +64,11 @@ export
     ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, CubicBSplinesFitting, discount_function, guess_size,
 
     # cash_flows/cash_flows.jl
-    SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
+    SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
     accrual_days, accrual_days, next_cashflow, has_occurred,
 
     # instruments/bond.jl
-    FixedRateBond, value, get_settlement_date, notional, accrued_amount, yield, duration,
+    FixedRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv, 
     # instruments/rate.jl
     DepositRate,
 

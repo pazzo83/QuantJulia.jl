@@ -10,7 +10,7 @@ type DepositRate <: AbstractRate
   evaluationDate::Date
   referenceDate::Date
   earliestDate::Date
-  latestDate::Date
+  maturityDate::Date
   fixingDate::Date
 end
 
@@ -19,7 +19,7 @@ function DepositRate(rate::Quote, tenor::Base.Dates.Period, fixingDays::Integer,
   evaluation_date = settings.evaluation_date
   reference_date = adjust(calendar, convention, evaluation_date)
   earliest_date = advance(Dates.Day(fixingDays), calendar, reference_date, convention)
-  latest_date = maturity_date(ibor_index, earliest_date)
+  maturity_d = maturity_date(ibor_index, earliest_date)
   fix_date = fixing_date(ibor_index, earliest_date)
-  return DepositRate(rate, tenor, fixingDays, calendar, convention, endOfMonth, dc, ibor_index, evaluation_date, reference_date, earliest_date, latest_date, fix_date)
+  return DepositRate(rate, tenor, fixingDays, calendar, convention, endOfMonth, dc, ibor_index, evaluation_date, reference_date, earliest_date, maturity_d, fix_date)
 end

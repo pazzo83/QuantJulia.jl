@@ -23,7 +23,7 @@ type FixedRateCoupon <: Coupon
   refPeriodEnd::Date
 end
 
-amount(coup::FixedRateCoupon) = coup.nominal * (compound_factor(coup.rate, coup.accrualStartDate, coup.accrualEndDate) - 1)
+amount(coup::FixedRateCoupon) = coup.nominal * (compound_factor(coup.rate, coup.accrualStartDate, coup.accrualEndDate, coup.refPeriodStart, coup.refPeriodEnd) - 1)
 date(coup::FixedRateCoupon) = coup.paymentDate
 
 # legs to build cash flows
@@ -60,6 +60,10 @@ type FixedRateLeg <: Leg
   end
 end
 
+type ZeroCouponLeg <: Leg
+  redemption::SimpleCashFlow
+end
+
 ## Function wrapper for solvers ##
 type IRRFinder
   leg::Leg
@@ -90,7 +94,7 @@ function operator(finder::IRRFinder)
 end
 
 ## NPV METHODS ##
-function npv(leg::Leg, yts::YieldTermStructure, settlement_date::Date, npv_date::Date)
+function npv(leg::FixedRateLeg, yts::YieldTermStructure, settlement_date::Date, npv_date::Date)
   # stuff
   totalNPV = 0.0
   if length(leg.coupons) == 0
@@ -98,10 +102,11 @@ function npv(leg::Leg, yts::YieldTermStructure, settlement_date::Date, npv_date:
   end
 
   for i in leg
-    #TODO: check has occurred
-    @inbounds if date(i) > settlement_date
-      @inbounds totalNPV += amount(i) * discount(yts, date(i))
+    if has_occurred(i, settlement_date)
+      continue
     end
+
+    @inbounds totalNPV += amount(i) * discount(yts, date(i))
   end
 
   # redemption - not needed with new iterator
@@ -110,7 +115,7 @@ function npv(leg::Leg, yts::YieldTermStructure, settlement_date::Date, npv_date:
   return totalNPV / discount(yts, npv_date)
 end
 
-function npv(leg::Leg, y::InterestRate, include_settlement_cf::Bool, settlement_date::Date, npv_date::Date)
+function npv(leg::FixedRateLeg, y::InterestRate, include_settlement_cf::Bool, settlement_date::Date, npv_date::Date)
   if length(leg.coupons) == 0
     return 0.0
   end
@@ -120,6 +125,9 @@ function npv(leg::Leg, y::InterestRate, include_settlement_cf::Bool, settlement_
   last_date = npv_date
 
   for cp in leg
+    if has_occurred(cp, settlement_date)
+      continue
+    end
     coupon_date = date(cp)
     amount_ = amount(cp)
 
@@ -155,6 +163,15 @@ function npv(leg::Leg, y::InterestRate, include_settlement_cf::Bool, settlement_
   return totalNPV
 end
 
+function npv(leg::ZeroCouponLeg, yts::YieldTermStructure, settlement_date::Date, npv_date::Date)
+  if amount(leg.redemption) == 0.0
+    return 0.0
+  end
+
+  totalNPV = amount(leg.redemption) * discount(yts, date(leg.redemption))
+  return totalNPV / discount(yts, npv_date)
+end
+
 ## Duration Calculations ##
 modified_duration_calc(::SimpleCompounding, c::Float64, B::Float64, t::Float64, ::Float64, ::Frequency) = c * B * B * t
 modified_duration_calc(::CompoundedCompounding, c::Float64, B::Float64, t::Float64, r::Float64, N::Frequency) = c * t * B / (1 + r / QuantJulia.Time.value(N))
@@ -179,7 +196,10 @@ function duration(::ModifiedDuration, leg::Leg, y::InterestRate, dc::DayCount, i
   last_date = npv_date
 
   for cp in leg
-    # TODO check has occurred
+    if has_occurred(cp, settlement_date)
+      continue
+    end
+
     c = amount(cp)
     coupon_date = date(cp)
     if isa(cp, FixedRateCoupon)
@@ -268,9 +288,9 @@ function accrued_amount(coup::FixedRateCoupon, settlement_date::Date)
   return coup.nominal * (compound_factor(coup.rate, coup.accrualStartDate, min(settlement_date, coup.accrualEndDate)) - 1.0)
 end
 
-function has_occurred(cf::CashFlow, ref_date::Date)
+function has_occurred(cf::CashFlow, ref_date::Date, include_settlement_cf::Bool = true)
   # will need to expand this
-  if ref_date < date(cf)
+  if ref_date < date(cf) || (ref_date == date(cf) && include_settlement_cf)
     return false
   else
     return true

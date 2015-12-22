@@ -1,4 +1,4 @@
-using QuantJulia, FloatFloat
+using QuantJulia
 
 abstract CostFunction
 

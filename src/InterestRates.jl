@@ -66,7 +66,7 @@ end
 
 # methods to calcualte the implied rate based on compounding type
 _implied_rate(::SimpleCompounding, compound::Float64, time_frac::Float64, ::Frequency) = (compound - 1.0) / time_frac
-_implied_rate(::CompoundedCompounding, compound::Float64, time_frac::Float64, freq::Frequency) = (compound ^ (1.0 / value(freq) * time_frac) - 1.0) * value(freq)
+_implied_rate(::CompoundedCompounding, compound::Float64, time_frac::Float64, freq::Frequency) = (compound ^ (1.0 / QuantJulia.Time.value(freq) * time_frac) - 1.0) * QuantJulia.Time.value(freq)
 _implied_rate(::ContinuousCompounding, compound::Float64, time_frac::Float64, ::Frequency) = log(compound) / time_frac
 _implied_rate(::SimpleThenCompounded, compound::Float64, time_frac::Float64, freq::Frequency) =
   time_frac <= 1.0 ? _implied_rate(SimpleCompounding(), compound, time_frac, freq) : _implied_rate(CompoundedCompounding(), compound, time_frac, freq)
