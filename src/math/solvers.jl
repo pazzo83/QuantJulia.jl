@@ -2,8 +2,8 @@
 
 abstract Solver1D
 
-type SolverInfo
-  maxEvals::Integer
+type SolverInfo{I <: Integer}
+  maxEvals::I
   lowerBoundEnforced::Bool
   upperBoundEnforced::Bool
   lowerBound::Float64
@@ -14,19 +14,19 @@ end
 type BrentSolver <: Solver1D
   solverInfo::SolverInfo
 end
-BrentSolver(maxEvals::Integer = 100, lowerBoundEnforced::Bool = false, upperBoundEnforced::Bool = false, lowerBound::Float64 = 0.0, upperBound::Float64 = 0.0) =
+BrentSolver{I <: Integer}(maxEvals::I = 100, lowerBoundEnforced::Bool = false, upperBoundEnforced::Bool = false, lowerBound::Float64 = 0.0, upperBound::Float64 = 0.0) =
   BrentSolver(SolverInfo(maxEvals, lowerBoundEnforced, upperBoundEnforced, lowerBound, upperBound))
 
 type NewtonSolver <: Solver1D
   solverInfo::SolverInfo
 end
-NewtonSolver(maxEvals::Integer = 100, lowerBoundEnforced::Bool = false, upperBoundEnforced::Bool = false, lowerBound::Float64 = 0.0, upperBound::Float64 = 0.0) =
+NewtonSolver{I <: Integer}(maxEvals::I = 100, lowerBoundEnforced::Bool = false, upperBoundEnforced::Bool = false, lowerBound::Float64 = 0.0, upperBound::Float64 = 0.0) =
   NewtonSolver(SolverInfo(maxEvals, lowerBoundEnforced, upperBoundEnforced, lowerBound, upperBound))
 
 type FiniteDifferenceNewtonSafe <: Solver1D
   solverInfo::SolverInfo
 end
-FiniteDifferenceNewtonSafe(maxEvals::Integer = 100, lowerBoundEnforced::Bool = false, upperBoundEnforced::Bool = false, lowerBound::Float64 = 0.0, upperBound::Float64 = 0.0) =
+FiniteDifferenceNewtonSafe{I <: Integer}(maxEvals::I = 100, lowerBoundEnforced::Bool = false, upperBoundEnforced::Bool = false, lowerBound::Float64 = 0.0, upperBound::Float64 = 0.0) =
   FiniteDifferenceNewtonSafe(SolverInfo(maxEvals, lowerBoundEnforced, upperBoundEnforced, lowerBound, upperBound))
 
 # misc functions for solving
@@ -46,7 +46,7 @@ function is_close(x::Float64, y::Float64, n::Int64 = 42)
 end
 
 # solver functions
-function solve(solver::Solver1D, f::Function, accuracy::Float64, guess::Float64, step::Float64)
+function solve{S <: Solver1D}(solver::S, f::Function, accuracy::Float64, guess::Float64, step::Float64)
   ## This method returns the 0 of a function determined by a given accuracy.  This method using bracketing
   ## routine to which an intial guess must be supplied as well as a step
   growth_factor = 1.6
@@ -106,7 +106,7 @@ function solve(solver::Solver1D, f::Function, accuracy::Float64, guess::Float64,
   error("Cannot converge!")
 end
 
-function solve(solver::Solver1D, f::Function, accuracy::Float64, guess::Float64, xMin::Float64, xMax::Float64)
+function solve{S <: Solver1D}(solver::S, f::Function, accuracy::Float64, guess::Float64, xMin::Float64, xMax::Float64)
   fxMin = f(xMin)
   if is_close(fxMin, 0.0)
     return xMin
@@ -124,7 +124,7 @@ end
 
 ### INDIVIDUAL SOLVER IMPLEMENTATIONS ###
 # brent solver function
-function _solve(solver::BrentSolver, f::Function, accuracy::Float64, xMin::Float64, xMax::Float64, fxMin::Float64, fxMax::Float64, root::Float64, eval_num::Integer)
+function _solve{I <: Integer}(solver::BrentSolver, f::Function, accuracy::Float64, xMin::Float64, xMax::Float64, fxMin::Float64, fxMax::Float64, root::Float64, eval_num::I)
   froot = f(root)
   eval_num += 1
   max_evals = solver.solverInfo.maxEvals
@@ -215,8 +215,8 @@ function _solve(solver::BrentSolver, f::Function, accuracy::Float64, xMin::Float
 end
 
 # Finite Differences Solver
-function _solve(solver::FiniteDifferenceNewtonSafe, f::Function, accuracy::Float64, xMin::Float64, xMax::Float64, fxMin::Float64, fxMax::Float64,
-                root::Float64, eval_num::Integer)
+function _solve{I <: Integer}(solver::FiniteDifferenceNewtonSafe, f::Function, accuracy::Float64, xMin::Float64, xMax::Float64, fxMin::Float64, fxMax::Float64,
+                root::Float64, eval_num::I)
 
   max_evals = solver.solverInfo.maxEvals
   # orienting search such that f(xl) < 0
@@ -275,7 +275,7 @@ function _solve(solver::FiniteDifferenceNewtonSafe, f::Function, accuracy::Float
 end
 
 # Newton Solver (safe)
-function _solve(solver::NewtonSolver, f::Function, accuracy::Float64, xMin::Float64, xMax::Float64, fxMin::Float64, fxMax::Float64, root::Float64, eval_num::Integer)
+function _solve{I <: Integer}(solver::NewtonSolver, f::Function, accuracy::Float64, xMin::Float64, xMax::Float64, fxMin::Float64, fxMax::Float64, root::Float64, eval_num::I)
   # Orient the search so that f(xl) < 0
   if fxMin < 0.0
     xl = xMin
@@ -327,7 +327,7 @@ function _solve(solver::NewtonSolver, f::Function, accuracy::Float64, xMin::Floa
   error("Maximum number of function evals exceeded!")
 end
 
-function enforced_bounds(solver::Solver1D, x::Float64)
+function enforced_bounds{S <: Solver1D}(solver::S, x::Float64)
   if solver.solverInfo.lowerBoundEnforced && x < solver.solverInfo.lowerBound
     return solver.solverInfo.lowerBound
   end

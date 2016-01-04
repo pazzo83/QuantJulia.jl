@@ -32,7 +32,7 @@ include("math/Math.jl")
 export
     # abstract_types.jl
     CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap,
-    FittingMethod, CashFlows, CashFlow, Coupon, Instrument, Bond, PricingEngine, Duration, RateHelper,
+    FittingMethod, CashFlows, CashFlow, Coupon, CouponPricer, IborCouponPricer, Instrument, Bond, Swap, SwapType, PricingEngine, Duration, AbstractRate,
     InterestRateIndex, AbstractCurrency,
 
     # quotes/Quotes.jl
@@ -46,15 +46,21 @@ export
     InterestRate, discount_factor, compound_factor, equivalent_rate, implied_rate,
 
     # Indexes
-    IborIndex, fixing_date, maturity_date, fixing, forecast_fixing,
+    IborIndex, fixing_date, maturity_date, fixing, forecast_fixing, euribor_index,
+
+    # termstructures/TermStructures.jl
+    check_range, max_date, time_from_reference,
 
     # termstructures/yield_term_structure.jl
-    FlatForwardTermStructure, JumpDate, JumpTime,
-    calculated!, check_range, max_date, time_from_reference, discount, zero_rate, forward_rate, discount_impl,
+    NullYieldTermStructure, FlatForwardTermStructure, JumpDate, JumpTime,
+    calculated!, discount, zero_rate, forward_rate, discount_impl,
 
     # termstructures/curve.jl
     PiecewiseYieldCurve, FittedBondDiscountCurve, FittingCost, NullCurve,
     max_date, discount, calculate!, initialize!, value,
+
+    # termstructures/vol_term_structure.jl
+    ConstantOptionVolatility,
 
     # termstructures/bootstrap.jl
     Discount, guess, min_value_after, max_value_after,
@@ -64,13 +70,15 @@ export
     ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, CubicBSplinesFitting, discount_function, guess_size,
 
     # cash_flows/cash_flows.jl
-    SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
+    BlackIborCouponPricer, SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
     accrual_days, accrual_days, next_cashflow, has_occurred,
 
     # instruments/bond.jl
-    FixedRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv, 
+    FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv,
     # instruments/rate.jl
     DepositRate,
+    # instruments/swap.jl
+    Payer, Receiver, VanillaSwap,
 
     # termstructures/bond_helpers.jl
     implied_quote, clean_price, dirty_price, settlement_date,
@@ -97,10 +105,13 @@ include("InterestRates.jl")
 include("indexes/indexes.jl")
 
 # Term Structures -----------------------------------
+include("termstructures/TermStructures.jl")
 # yield term structures
 include("termstructures/yield_term_structure.jl")
 # Curves
 include("termstructures/curve.jl")
+# volatility
+include("termstructures/vol_term_structure.jl")
 # bootstrapping
 include("termstructures/bootstrap.jl")
 
@@ -111,6 +122,7 @@ include("cash_flows/cash_flows.jl")
 # bond
 include("instruments/bond.jl")
 include("instruments/rate.jl")
+include("instruments/swap.jl")
 
 # helpers
 include("termstructures/bond_helpers.jl")

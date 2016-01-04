@@ -1,13 +1,23 @@
 # Pricing Engines module
 # module PricingEngines
 
-type DiscountingBondEngine <: PricingEngine end
+type DiscountingBondEngine{Y <: YieldTermStructure} <: PricingEngine{Y}
+  yts::Y
 
-function calculate!(::DiscountingBondEngine, yts::YieldTermStructure, bond::Bond, recalculate::Bool=false)
+  function call(::Type{DiscountingBondEngine})
+    new{YieldTermStructure}()
+  end
+
+  function call{Y}(::Type{DiscountingBondEngine}, yts::Y)
+    new{Y}(yts)
+  end
+end
+
+function calculate!{E <: DiscountingBondEngine, B <: Bond}(pe::E, bond::B, recalculate::Bool=false)
   if bond.calculated && !recalculate
     return bond
   end
-
+  yts = pe.yts
   valuation_date = yts.referenceDate
   value = npv(bond.cashflows, yts, valuation_date, valuation_date)
   bond.settlementValue = value

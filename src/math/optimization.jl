@@ -12,18 +12,18 @@ type Simplex <: OptimizationMethod
   lambda::Float64
 end
 
-type Problem{T}
-  costFunction::CostFunction
-  constraint::Constraint
+type Problem{F <: CostFunction, C <: Constraint, T, I <: Integer}
+  costFunction::F
+  constraint::C
   initialValue::Vector{T}
   currentValue::Vector{T}
   functionValue::Float64
   squaredNorm::Float64
-  functionEvaluation::Integer
-  gradientEvaluation::Integer
+  functionEvaluation::I
+  gradientEvaluation::I
 end
 
-function Problem{T}(costFunction::CostFunction, constraint::Constraint, initialValue::Vector{T})
+function Problem{F <: CostFunction, C <: Constraint, T}(costFunction::F, constraint::C, initialValue::Vector{T})
   currentValue = initialValue
   functionValue = 0.0
   squaredNorm = 0.0
@@ -33,9 +33,9 @@ function Problem{T}(costFunction::CostFunction, constraint::Constraint, initialV
   return Problem(costFunction, constraint, initialValue, currentValue, functionValue, squaredNorm, functionEvaluation, gradientEvaluation)
 end
 
-type EndCriteria
-  maxIterations::Integer
-  maxStationaryStateIterations::Integer
+type EndCriteria{I <: Integer}
+  maxIterations::I
+  maxStationaryStateIterations::I
   rootEpsilon::Float64
   functionEpsilon::Float64
   gradientNormEpsilon::Float64
@@ -43,7 +43,7 @@ end
 
 test{T}(::NoConstraint, ::Vector{T}) = true
 
-function update{T}(constraint::Constraint, params::Vector{T}, direction::Vector{Float64}, beta::Float64)
+function update{C <: Constraint, T}(constraint::C, params::Vector{T}, direction::Vector{Float64}, beta::Float64)
   diff = beta
   new_params = params + diff * direction
   valid = test(constraint, new_params)
@@ -354,7 +354,7 @@ function value!{T}(p::Problem, x::Vector{T})
   return QuantJulia.value(p.costFunction, x)
 end
 
-function extrapolate!{T}(p::Problem, i_highest::Integer, factor::Float64, values::Vector{T}, sum_array::Vector{T},
+function extrapolate!{I <: Integer, T}(p::Problem, i_highest::I, factor::Float64, values::Vector{T}, sum_array::Vector{T},
                     vertices::Vector{Vector{T}})
   pTry = zeros(length(sum_array))
   while true

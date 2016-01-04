@@ -62,7 +62,7 @@ function initialize!(interp::LinearInterpolation, x_vals::Vector{Float64}, y_val
 end
 
 # Log Interpolation update
-function update!(interp::LogInterpolation, idx::Int64)
+function update!{I <: Integer}(interp::LogInterpolation, idx::I)
   # first get the log of the y values
   for i = 1:idx
     @inbounds interp.interpolator.y_vals[i] = log(interp.y_vals[i])
@@ -75,7 +75,7 @@ function update!(interp::LogInterpolation, idx::Int64)
 end
 
 # update if value passed in
-function update!(interp::LogInterpolation, idx::Int64, val::Float64)
+function update!{I <: Integer}(interp::LogInterpolation, idx::I, val::Float64)
   interp.y_vals[idx] = val
 
   update!(interp, idx)
@@ -84,7 +84,7 @@ function update!(interp::LogInterpolation, idx::Int64, val::Float64)
 end
 
 # Linear Interpolation update
-function update!(interp::LinearInterpolation, idx::Int64)
+function update!{I <: Integer}(interp::LinearInterpolation, idx::I)
   for i = 2:idx
     @inbounds dx = interp.x_vals[i] - interp.x_vals[i - 1]
     @inbounds interp.s[i - 1] = (interp.y_vals[i] - interp.y_vals[i - 1]) / dx
@@ -94,7 +94,7 @@ function update!(interp::LinearInterpolation, idx::Int64)
 end
 
 # locate x
-function locate(interp::Interpolation, val::Float64)
+function locate{I <: Interpolation}(interp::I, val::Float64)
   if val < interp.x_vals[1]
     return 1
   elseif val >= interp.x_vals[end]

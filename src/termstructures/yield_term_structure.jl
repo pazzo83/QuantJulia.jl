@@ -1,20 +1,9 @@
 # main term structures
 using QuantJulia.Time
 
-# core TermStructure methods
-function check_range(ts::TermStructure, date::Date)
-  date < ts.referenceDate && "Date $date before reference_date $(ts.referenceDate)"
-end
+type NullYieldTermStructure <: YieldTermStructure end
 
-function check_range(ts::TermStructure, time_frac::Float64)
-  time_frac < 0.0 && "Negative time given: $time"
-end
-
-max_date(ts) = ts.referenceDate + Date.Year(100)
-
-time_from_reference(ts::TermStructure, date::Date) = year_fraction(ts.dc, ts.referenceDate, date, Date(), Date())
-
-function calculate!(ts::TermStructure, recalculate::Bool=false)
+function calculate!{T <: TermStructure}(ts::T, recalculate::Bool=false)
   if !ts.calculated || recalculate
     _calculate!(ts)
   end
@@ -32,9 +21,9 @@ type JumpTime
   ts_time::Float64
 end
 
-discount(yts::YieldTermStructure, date::Date) = discount(yts, time_from_reference(yts, date))
+discount{T <: YieldTermStructure}(yts::T, date::Date) = discount(yts, time_from_reference(yts, date))
 
-function discount(yts::YieldTermStructure, time_frac::Float64)
+function discount{T <: YieldTermStructure}(yts::T, time_frac::Float64)
   disc = discount_impl(yts, time_frac)
   if length(yts.jump_times) == 0
     return disc
@@ -52,7 +41,7 @@ function discount(yts::YieldTermStructure, time_frac::Float64)
   return jump_effect * disc
 end
 
-function zero_rate(yts::YieldTermStructure, date::Date, dc::DayCount, comp::CompoundingType, freq::Frequency)
+function zero_rate{T <: YieldTermStructure, C <: CompoundingType, F <: Frequency}(yts::T, date::Date, dc::DayCount, comp::C, freq::F)
   if date == yts.referenceDate
     return implied_rate(1.0 / discount(yts, 0.0001), dc, comp, 0.0001, freq)
   else
@@ -60,12 +49,12 @@ function zero_rate(yts::YieldTermStructure, date::Date, dc::DayCount, comp::Comp
   end
 end
 
-function zero_rate(yts::YieldTermStructure, time_frac::Float64, comp::CompoundingType, freq::Frequency)
+function zero_rate{T <: YieldTermStructure, C <: CompoundingType, F <: Frequency}(yts::T, time_frac::Float64, comp::C, freq::F)
   t = time_frac == 0.0 ? 0.0001 : time_frac
   return implied_rate(1.0 / discount(yts, t), comp, t, freq)
 end
 
-function forward_rate(yts::YieldTermStructure, date1::Date, date2::Date, dc::DayCount, comp::CompoundingType, freq::Frequency)
+function forward_rate{T <: YieldTermStructure, DC <: DayCount, C <: CompoundingType, F <: Frequency}(yts::T, date1::Date, date2::Date, dc::DC, comp::C, freq::F)
   if date1 == date2
     t1 = max(time_from_reference(yts, date1) - 0.0001 / 2.0, 0.0)
     t2 = t1 + 0.0001
@@ -77,9 +66,9 @@ function forward_rate(yts::YieldTermStructure, date1::Date, date2::Date, dc::Day
   end
 end
 
-forward_rate(yts::YieldTermStructure, date::Date, period::Integer, dc::DayCount, comp::CompoundingType, freq::Frequency) = forward_rate(yts, date, date + Dates.Day(period), dc, comp, freq)
+forward_rate{T <: YieldTermStructure, DC <: DayCount, C <: CompoundingType, F <: Frequency}(yts::T, date::Date, period::Integer, dc::DC, comp::C, freq::F) = forward_rate(yts, date, date + Dates.Day(period), dc, comp, freq)
 
-function forward_rate(yts::YieldTermStructure, time1::Float64, time2::Float64, comp::CompoundingType, freq::Frequency)
+function forward_rate{T <: YieldTermStructure, C <: CompoundingType, F <: Frequency}(yts::T, time1::Float64, time2::Float64, comp::C, freq::F)
   if time1 == time2
     t1 = max(time1 - 0.0001 / 2.0, 0.0)
     t2 = t1 + 0.0001

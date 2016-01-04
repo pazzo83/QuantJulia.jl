@@ -4,12 +4,12 @@ using QuantJulia.Math, QuantJulia.Time
 
 type NullCurve <: Curve end
 
-type PiecewiseYieldCurve{I} <: InterpolatedCurve{I}
+type PiecewiseYieldCurve{I <: Instrument, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait} <: InterpolatedCurve{I, DC, P, T}
   referenceDate::Date
   instruments::Vector{I}
-  dc::DayCount
-  interp::Interpolation
-  trait::BootstrapTrait
+  dc::DC
+  interp::P
+  trait::T
   accuracy::Float64
   boot::Bootstrap
   times::Vector{Float64}
@@ -19,7 +19,7 @@ type PiecewiseYieldCurve{I} <: InterpolatedCurve{I}
   calculated::Bool
 end
 
-function PiecewiseYieldCurve{I}(referenceDate::Date, instruments::Vector{I}, dc::DayCount, interp::Interpolation, trait::BootstrapTrait,
+function PiecewiseYieldCurve{I <: Instrument, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait}(referenceDate::Date, instruments::Vector{I}, dc::DC, interp::P, trait::T,
                                 accuracy::Float64, boot::Bootstrap)
   # get the initial length of instruments
   n = length(instruments)
@@ -38,31 +38,31 @@ function PiecewiseYieldCurve{I}(referenceDate::Date, instruments::Vector{I}, dc:
                             false)
 
   # initialize the bootstrapping
-  initialize(boot, pyc)
+  initialize(pyc.boot, pyc)
 
   return pyc
 end
 
-type FittedBondDiscountCurve{B <: Bond} <: Curve
-  settlementDays::Integer
+type FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: Bond, DC <: DayCount, F <: FittingMethod} <: Curve
+  settlementDays::I
   referenceDate::Date
-  calendar::BusinessCalendar
+  calendar::C
   bonds::Vector{B}
-  dc::DayCount
-  fittingMethod::FittingMethod
+  dc::DC
+  fittingMethod::F
   accuracy::Float64
-  maxEvaluations::Integer
+  maxEvaluations::I
   simplexLambda::Float64
   calculated::Bool
 
-  FittedBondDiscountCurve(settlementDays::Integer,
+  FittedBondDiscountCurve(settlementDays::I,
                           referenceDate::Date,
-                          calendar::BusinessCalendar,
+                          calendar::C,
                           bonds::Vector{B},
-                          dc::DayCount,
-                          fittingMethod::FittingMethod,
+                          dc::DC,
+                          fittingMethod::F,
                           accuracy::Float64,
-                          maxEvaluations::Integer,
+                          maxEvaluations::I,
                           simplexLambda::Float64) =
 
                           (x = new(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda, false);
@@ -81,33 +81,33 @@ type FittedBondDiscountCurve{B <: Bond} <: Curve
   # end
 end
 
-FittedBondDiscountCurve{B <: Bond}(settlementDays::Integer, referenceDate::Date, calendar::BusinessCalendar, bonds::Vector{B}, dc::DayCount, fittingMethod::FittingMethod, accuracy::Float64=1e-10,
-                                     maxEvaluations::Integer=10000, simplexLambda::Float64=1.0) =
-                                     FittedBondDiscountCurve{B}(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda)
+FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: Bond, DC <: DayCount, F <: FittingMethod}(settlementDays::I, referenceDate::Date, calendar::C, bonds::Vector{B}, dc::DC, fittingMethod::F, accuracy::Float64=1e-10,
+                                     maxEvaluations::I=10000, simplexLambda::Float64=1.0) =
+                                     FittedBondDiscountCurve{I, C, B, DC, F}(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda)
 
-type FittingCost <: CostFunction
+type FittingCost{I <: Integer} <: CostFunction
   # value::Vector{Float64}
   # values::Vector{Float64}
-  firstCashFlow::Vector{Integer}
+  firstCashFlow::Vector{I}
   curve::Curve
 end
 
-function FittingCost(size::Integer, curve::Curve)
+function FittingCost{I <: Integer, C <: Curve}(size::I, curve::C)
   # value = Vector{Float64}()
   # values = Vector{Float64}()
-  firstCashFlow = zeros(Int, size)
+  firstCashFlow = zeros(I, size)
 
   return FittingCost(firstCashFlow, curve)
 end
 
 # Interpolated Curve methods #
-max_date(curve::InterpolatedCurve) = curve.dates[end]
+max_date{C <: InterpolatedCurve}(curve::C) = curve.dates[end]
 
-function discount(curve::Curve, t::Float64)
+function discount{C <: Curve}(curve::C, t::Float64)
   return discount_impl(curve, t)
 end
 
-function discount_impl(curve::InterpolatedCurve, t::Float64)
+function discount_impl{C <: InterpolatedCurve}(curve::C, t::Float64)
   if t <= curve.times[end]
     return QuantJulia.Math.value(curve.interp, t)
   end
@@ -119,7 +119,7 @@ function discount_impl(curve::InterpolatedCurve, t::Float64)
   # do flat fwd extrapolation
 end
 
-function _calculate!(curve::InterpolatedCurve)
+function _calculate!{C <: InterpolatedCurve}(curve::C)
   calculate!(curve.boot)
   curve.calculated = true
   return curve
@@ -149,7 +149,7 @@ function initialize!(curve::FittedBondDiscountCurve)
     ytm = yield(bond, clean_price, dc, yield_comp, freq, bond_settlement)
     dur = duration(bond, ytm, dc, yield_comp, freq, ModifiedDuration(), bond_settlement)
 
-    curve.fittingMethod.commons.weights[i] = 1.0 / big(dur)
+    curve.fittingMethod.commons.weights[i] = 1.0 / dur
     squared_sum += curve.fittingMethod.commons.weights[i] * curve.fittingMethod.commons.weights[i]
 
     cf = bond.cashflows
@@ -204,7 +204,7 @@ function _calculate!(curve::FittedBondDiscountCurve)
   return curve
 end
 
-function value{T}(cf::CostFunction, x::Vector{T})
+function value{C <: CostFunction, T}(cf::C, x::Vector{T})
   ref_date = cf.curve.referenceDate
   dc = cf.curve.dc
   squared_error = 0.0

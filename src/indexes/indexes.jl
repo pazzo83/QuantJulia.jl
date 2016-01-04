@@ -1,21 +1,26 @@
 using QuantJulia.Time
 
-type IborIndex <: InterestRateIndex
-  familyName::AbstractString
-  tenor::Base.Dates.Period
-  fixingDays::Integer
+type IborIndex{S <: AbstractString, I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount, T <: TermStructure} <: InterestRateIndex
+  familyName::S
+  tenor::TenorPeriod
+  fixingDays::I
   currency::AbstractCurrency
-  fixingCalendar::BusinessCalendar
-  convention::BusinessDayConvention
+  fixingCalendar::B
+  convention::C
   endOfMonth::Bool
-  dc::DayCount
+  dc::DC
+  ts::T
+
+  call{S, I, B, C, DC}(::Type{IborIndex}, familyName::S, tenor::TenorPeriod, fixingDays::I, currency::AbstractCurrency, fixingCalendar::B,
+                                convention::C, endOfMonth::Bool, dc::DC) =
+    new{S, I, B, C, DC, TermStructure}(familyName, tenor, fixingDays, currency, fixingCalendar, convention, endOfMonth, dc)
 end
 
-fixing_date(idx::InterestRateIndex, d::Date) = advance(Base.Dates.Day(-idx.fixingDays), idx.fixingCalendar, d, idx.convention)
-maturity_date(idx::IborIndex, d::Date) = advance(idx.tenor, idx.fixingCalendar, d, idx.convention)
-value_date(idx::InterestRateIndex, d::Date) = advance(Base.Dates.Day(idx.fixingDays), idx.fixingCalendar, d, idx.convention)
+fixing_date{I <: InterestRateIndex}(idx::I, d::Date) = advance(Dates.Day(-idx.fixingDays), idx.fixingCalendar, d, idx.convention)
+maturity_date(idx::IborIndex, d::Date) = advance(idx.tenor.period, idx.fixingCalendar, d, idx.convention)
+value_date{I <: InterestRateIndex}(idx::I, d::Date) = advance(Dates.Day(idx.fixingDays), idx.fixingCalendar, d, idx.convention)
 
-function fixing(idx::InterestRateIndex, ts::TermStructure, fixing_date::Date, forecast_todays_fixing::Bool=true)
+function fixing{I <: InterestRateIndex, T <: TermStructure}(idx::I, ts::T, fixing_date::Date, forecast_todays_fixing::Bool=true)
   today = settings.evaluation_date
   if fixing_date > today || (fixing_date == today && forecast_todays_fixing)
     return forecast_fixing(idx, ts, fixing_date)
@@ -37,3 +42,15 @@ function forecast_fixing(idx::IborIndex, ts::TermStructure, d1::Date, d2::Date, 
 
   return (disc1 / disc2 - 1.0) / t
 end
+
+# types of indexes
+function euribor_index(tenor::TenorPeriod)
+  return IborIndex("Euribor", tenor, 2, EURCurrency(), QuantJulia.Time.TargetCalendar(), euribor_conv(tenor.period), euribor_eom(tenor.period),
+                  QuantJulia.Time.Actual360())
+end
+
+euribor_conv(::Union{Base.Dates.Day, Base.Dates.Week}) = QuantJulia.Time.Following()
+euribor_conv(::Union{Base.Dates.Month, Base.Dates.Year}) = QuantJulia.Time.ModifiedFollowing()
+
+euribor_eom(::Union{Base.Dates.Day, Base.Dates.Week}) = false
+euribor_eom(::Union{Base.Dates.Month, Base.Dates.Year}) = true

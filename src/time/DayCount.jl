@@ -24,7 +24,7 @@ type SimpleDayCount <: DayCount end
 
 # Day Counting
 # default day count method
-day_count(c::DayCount, d_start::Date, d_end::Date) = Int(d_end - d_start)
+day_count{C <: DayCount}(c::C, d_start::Date, d_end::Date) = Int(d_end - d_start)
 
 # days per year
 days_per_year(::Union{Actual360, Thirty360}) = 360.0
@@ -34,9 +34,10 @@ days_per_year(::Actual365) = 365.0
 # default
 year_fraction(c::SimpleDayCount, d_start::Date, d_end::Date) = year_fraction(c, d_start, d_end, Date(), Date())
 
-year_fraction(c::DayCount, d_start::Date, d_end::Date) = day_count(c, d_start, d_end) / days_per_year(c)
+year_fraction{C <: DayCount}(c::C, d_start::Date, d_end::Date) = day_count(c, d_start, d_end) / days_per_year(c)
 
 # add'l methods
+# year_fraction(c::Union{Actual360, Thirty360, Actual365}, d_start::Date, d_end::Date) = year_fraction(c, d_start, d_end, Date(), Date())
 year_fraction(c::Union{Actual360, Thirty360, Actual365}, d_start::Date, d_end::Date, ::Date, ::Date) = year_fraction(c, d_start, d_end)
 
 function year_fraction(::SimpleDayCount, d_start::Date, d_end::Date, ::Date, ::Date)
@@ -125,7 +126,7 @@ function year_fraction(dc::ISMAActualActual, d1::Date, d2::Date, d3::Date, d4::D
         i += 1
       end
     end
-    sum += year_fraction(new_ref_start, d2, new_ref_start, new_ref_end)
+    sum += year_fraction(dc, new_ref_start, d2, new_ref_start, new_ref_end)
     return sum
   end
 end

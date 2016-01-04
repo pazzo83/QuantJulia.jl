@@ -6,6 +6,9 @@ abstract BusinessCalendar
 abstract WesternCalendar <: BusinessCalendar
 abstract OrthodoxCalendar <: BusinessCalendar
 
+# target calendar
+type TargetCalendar <: BusinessCalendar end
+
 # US Calendars
 abstract UnitedStatesCalendar <: WesternCalendar
 
@@ -20,7 +23,7 @@ type ModifiedFollowing <: BusinessDayConvention end
 type Following <: BusinessDayConvention end
 
 # easter functions
-function easter_rata(y::Integer)
+function easter_rata{I <: Integer}(y::I)
 
   c::Int64
 	e::Int64
@@ -51,13 +54,13 @@ function easter_rata(y::Integer)
 end
 
 # Returns Date
-function easter_date(y::Integer)
+function easter_date{I <: Integer}(y::I)
 	# Compute the gregorian date for Rata Die number
      return Date(Dates.rata2datetime( easter_rata(y) ))
 end
 
 # calendar functions
-function advance(days::Day, cal::BusinessCalendar, dt::Date, biz_conv::BusinessDayConvention)
+function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(days::Day, cal::C, dt::Date, biz_conv::B)
   n = Int(days)
   if n > 0
     while n > 0
@@ -80,13 +83,13 @@ function advance(days::Day, cal::BusinessCalendar, dt::Date, biz_conv::BusinessD
   return dt
 end
 
-function advance(months::Month, cal::BusinessCalendar, dt::Date, biz_conv::BusinessDayConvention)
+function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(months::Month, cal::C, dt::Date, biz_conv::B)
   dt += months
   return adjust(cal, biz_conv, dt)
 end
 
 
-function is_business_day(cal::BusinessCalendar, dt::Date)
+function is_business_day{C <: BusinessCalendar}(cal::C, dt::Date)
   if dayofweek(dt) in [6, 7] || is_holiday(cal, dt)
     return false
   else
@@ -201,10 +204,41 @@ function is_holiday(::USGovernmentBondCalendar, dt::Date)
 	return false
 end
 
-# adjustments
-adjust(::BusinessCalendar, ::Unadjusted, d::Date) = d
+function is_holiday(::TargetCalendar, dt::Date)
+  const yy = year(dt)
+	const mm = month(dt)
+	const dd = day(dt)
+  const easter_sun = easter_date(yy)
 
-function adjust(cal::BusinessCalendar, ::Union{ModifiedFollowing, Following}, d::Date)
+  if (
+    # New Years Day
+    (mm == 1 && dd == 1)
+    ||
+    # Good Friday
+    easter_sun - Day(2) == dt
+    ||
+    # Easter Monday
+    easter_sun + Day(1) == dt
+    ||
+    # Int'l Labor Day
+    (mm == 5 && dd == 1)
+    ||
+    # Christmas
+    (mm == 12 && dd == 25)
+    ||
+    # Day of Goodwill
+    (mm == 12 && dd == 26)
+    )
+    return true
+  else
+    return false
+  end
+end
+
+# adjustments
+adjust{B <: BusinessCalendar}(::B, ::Unadjusted, d::Date) = d
+
+function adjust{B <: BusinessCalendar}(cal::B, ::Union{ModifiedFollowing, Following}, d::Date)
   while !is_business_day(cal, d)
     d += Day(1)
   end

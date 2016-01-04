@@ -12,7 +12,7 @@ function build_bonds(bond_mats::Vector{Date}, bond_rates::Vector{Float64}, tenor
     # rate = bond_rates[i] / 100
     rate = bond_rates[i]
     sched = QuantJulia.Time.Schedule(issue_date, term_date, tenor, conv, conv, rule, true)
-    bond = FixedRateBond(0, 100.0, sched, rate, dc, conv, 100.0, issue_date, calendar, pricing_engine)
+    bond = FixedRateBond(Quote(100.0), 0, 100.0, sched, rate, dc, conv, 100.0, issue_date, calendar, pricing_engine)
     bonds[i] = bond
   end
 
@@ -325,7 +325,7 @@ function main2()
   insts = Vector{Instrument}(length(depo_rates) + length(issue_dates))
   for i = 1:length(depo_rates)
     depo_quote = Quote(depo_rates[i])
-    depo_tenor = depo_tens[i]
+    depo_tenor = QuantJulia.Time.TenorPeriod(depo_tens[i])
     depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv_depo, true, dc_depo)
     insts[i] = depo
   end
@@ -353,12 +353,27 @@ function main2()
   solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
   calculate!(bootstrap, yts, solver2, solver)
 
-  println(yts.data)
-
   # build zero coupon bond
   zcb = ZeroCouponBond(3, calendar, 100.0, Date(2013, 8, 15), QuantJulia.Time.Following(), 116.92, Date(2003, 8, 15))
 
-  NPV = npv(zcb, pricing_engine, yts)
+  # println(npv(zcb, pricing_engine, yts))
+  # println(clean_price(zcb))
+  # println(dirty_price(zcb))
+  return npv(zcb, pricing_engine), clean_price(zcb), dirty_price(zcb)
+end
 
-  println(NPV)
+function build_swaps()
+  settlement_date = Date(2008, 9, 18)
+  set_eval_date!(settings, settlement_date - Dates.Day(3))
+
+  fixedLegFreq = QuantJulia.Time.Annual()
+  fixedLegConv = QuantJulia.Time.Unadjusted()
+  fixedLegDC = QuantJulia.Time.EuroThirty360()
+  floatingLegIndex = euribor_index(QuantJulia.Time.TenorPeriod(Base.Dates.Month(6)))
+  forwardStart = Base.Dates.Day(1)
+  cal = QuantJulia.Time.TargetCalendar()
+
+  test_swap = VanillaSwap(0.025, Base.Dates.Year(2), cal, fixedLegFreq, fixedLegConv, fixedLegDC, floatingLegIndex, 0.0, forwardStart)
+
+  return test_swap
 end

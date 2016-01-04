@@ -1,6 +1,6 @@
 type DepositRate <: AbstractRate
   rate::Quote
-  tenor::Base.Dates.Period
+  tenor::TenorPeriod
   fixingDays::Integer
   calendar::BusinessCalendar
   convention::BusinessDayConvention
@@ -14,7 +14,7 @@ type DepositRate <: AbstractRate
   fixingDate::Date
 end
 
-function DepositRate(rate::Quote, tenor::Base.Dates.Period, fixingDays::Integer, calendar::BusinessCalendar, convention::BusinessDayConvention, endOfMonth::Bool, dc::DayCount)
+function DepositRate(rate::Quote, tenor::TenorPeriod, fixingDays::Integer, calendar::BusinessCalendar, convention::BusinessDayConvention, endOfMonth::Bool, dc::DayCount)
   ibor_index = IborIndex("no-fix", tenor, fixingDays, NullCurrency(), calendar, convention, endOfMonth, dc)
   evaluation_date = settings.evaluation_date
   reference_date = adjust(calendar, convention, evaluation_date)

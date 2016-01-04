@@ -1,15 +1,15 @@
 ### Based off of Ito.jl
 type NullCurrency <: AbstractCurrency end
 
-immutable Currency <: AbstractCurrency
-	name::AbstractString
-	code::AbstractString
-	numeric::Integer
-	symbol::AbstractString
-	fractionSymbol::AbstractString
-	fractionsPerUnit::Integer
+immutable Currency{S <: AbstractString, I <: Integer} <: AbstractCurrency
+	name::S
+	code::S
+	numeric::I
+	symbol::S
+	fractionSymbol::S
+	fractionsPerUnit::I
 	rounding::Function
-	formatString::AbstractString
+	formatString::S
 end
 
 # Data from http://fx.sauder.ubc.ca/currency_table.html

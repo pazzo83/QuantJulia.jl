@@ -9,7 +9,7 @@ type Derivative <: FunctionType end
 type BernsteinPolynomial end
 
 # misc functions - prob put in own file
-function divide_array_by_self!{T}(a::Vector{T}, x::Number)
+function divide_array_by_self!{T, N <: Number}(a::Vector{T}, x::N)
   for i = 1:length(a)
     a[i] = a[i] / x
   end
@@ -17,7 +17,7 @@ function divide_array_by_self!{T}(a::Vector{T}, x::Number)
   return a
 end
 
-function multiply_array_by_self!{T}(a::Vector{T}, x::Number)
+function multiply_array_by_self!{T, N <: Number}(a::Vector{T}, x::N)
   for i = 1:length(a)
     a[i] = a[i] * x
   end
@@ -25,7 +25,7 @@ function multiply_array_by_self!{T}(a::Vector{T}, x::Number)
   return a
 end
 
-function get_factorial(i::Integer)
+function get_factorial{I <: Integer}(i::I)
   if i > 20
     return Float64(factorial(BigInt(i)))
   else
@@ -33,7 +33,7 @@ function get_factorial(i::Integer)
   end
 end
 
-function get_polynomial(::BernsteinPolynomial, i::Integer, n::Integer, x::Float64)
+function get_polynomial{I <: Integer}(::BernsteinPolynomial, i::I, n::I, x::Float64)
   coeff = get_factorial(n) / (get_factorial(n-1) * get_factorial(i))
 
   return coeff * (x ^ i) * (1.0 - x)^(n - i)
@@ -48,12 +48,12 @@ type BSpline
   knots::Vector{Float64}
 end
 
-function spline_oper(spline::BSpline, i::Integer, x::Float64)
+function spline_oper{I <: Integer}(spline::BSpline, i::I, x::Float64)
   i <= spline.n || error("i must not be greater than spline.n $i $(spline.n)")
   return N(spline, i, spline.p, x)
 end
 
-function N(spline::BSpline, i::Integer, p::Integer, x::Float64)
+function N{I <: Integer}(spline::BSpline, i::I, p::I, x::Float64)
   if p == 0
     return (spline.knots[i] <= x && x < spline.knots[i + 1]) ? 1.0 : 0.0
   else

@@ -1,4 +1,6 @@
 # Frequency
+using Base.Dates
+
 abstract Frequency
 
 type NoFrequency <: Frequency end
@@ -31,3 +33,6 @@ value(::Biweekly)		 	= 26
 value(::Weekly)			= 52
 value(::Daily)			 	= 365
 value(::OtherFrequency)   	= 999
+
+period(::Annual) = Year(1)
+period(::Semiannual) = Month(6)
