@@ -23,3 +23,5 @@ function DepositRate(rate::Quote, tenor::TenorPeriod, fixingDays::Integer, calen
   fix_date = fixing_date(ibor_index, earliest_date)
   return DepositRate(rate, tenor, fixingDays, calendar, convention, endOfMonth, dc, ibor_index, evaluation_date, reference_date, earliest_date, maturity_d, fix_date)
 end
+
+maturity_date{R <: AbstractRate}(rate::R) = rate.maturityDate

@@ -47,6 +47,7 @@ get_pricing_engine{Y}(::Discount, yts::Y) = DiscountingBondEngine(yts)
 
 apply_termstructure!{R <: AbstractRate, T <: TermStructure}(rate::R, ts::T) = rate.iborIndex.ts = ts
 apply_termstructure!{B <: Bond, T <: TermStructure}(b::B, ts::T) = b.pricingEngine.yts = ts
+apply_termstructure!{S <: Swap, T <: TermStructure}(s::S, ts::T) = s.iborIndex.ts = ts
 
 # BOOTSTRAPPING
 type IterativeBootstrap <: Bootstrap end
@@ -72,7 +73,7 @@ function initialize{T <: TermStructure}(::IterativeBootstrap, ts::T)
   # build times and error vectors (which have the functions for the solver)
   ts.times[1] = time_from_reference(ts, ts.referenceDate)
   for i = 2:n
-    @inbounds ts.times[i] = time_from_reference(ts, ts.instruments[i - 1].maturityDate)
+    @inbounds ts.times[i] = time_from_reference(ts, maturity_date(ts.instruments[i - 1]))
     @inbounds ts.errors[i] = bootstrap_error(i, ts.instruments[i - 1], ts)
     # set yield term Structure
     @inbounds apply_termstructure!(ts.instruments[i - 1], ts)

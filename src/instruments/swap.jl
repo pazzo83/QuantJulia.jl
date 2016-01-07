@@ -3,25 +3,47 @@ using QuantJulia.Time
 type Payer <: SwapType end
 type Receiver <: SwapType end
 
-type VanillaSwap <: Swap
-  swapT::SwapType
+type SwapResults <: Results
+  legNPV::Vector{Float64}
+  legBPS::Vector{Float64}
+  npvDateDiscount::Float64
+  startDiscounts::Vector{Float64}
+  endDiscounts::Vector{Float64}
+  value::Float64
+
+  function SwapResults{I <: Integer}(n::I)
+    legNPV = zeros(n)
+    legBPS = zeros(n)
+    startDiscounts = zeros(n)
+    endDiscounts = zeros(n)
+
+    new(legNPV, legBPS, 0.0, startDiscounts, endDiscounts, 0.0)
+  end
+end
+
+type VanillaSwap{ST <: SwapType, DC_fix <: DayCount, DC_float <: DayCount, B <: BusinessDayConvention, L <: Leg, P <: PricingEngine} <: Swap
+  rate::Quote
+  swapT::ST
   nominal::Float64
   fixedSchedule::Schedule
   fixedRate::Float64
-  fixedDayCount::DayCount
+  fixedDayCount::DC_fix
   iborIndex::IborIndex
   spread::Float64
   floatSchedule::Schedule
-  floatDayCount::DayCount
-  paymentConvention::BusinessDayConvention
-  legs::Vector{Leg}
+  floatDayCount::DC_float
+  paymentConvention::B
+  legs::Vector{L}
   payer::Vector{Float64}
+  pricingEngine::P
+  results::SwapResults
+  calculated::Bool
 end
 
 # Constructors
-function VanillaSwap(rate::Float64, tenor::Base.Dates.Period, cal::BusinessCalendar, fixedFrequency::Frequency, fixedConvention::BusinessDayConvention,
-                    fixedDayCount::DayCount, iborIndex::IborIndex, spread::Float64, fwdStart::Base.Dates.Period,
-                    settlementDays::Integer = iborIndex.fixingDays, nominal::Float64 = 1.0, swapT::SwapType = Payer())
+function VanillaSwap{PrT <: Dates.Period, C <: BusinessCalendar, F <: Frequency, B <: BusinessDayConvention, DC <: DayCount, PrS <: Dates.Period, P <: PricingEngine, I <: Integer, ST <: SwapType}(rate::Float64,
+                    tenor::PrT, cal::C, fixedFrequency::F, fixedConvention::B, fixedDayCount::DC, iborIndex::IborIndex, spread::Float64, fwdStart::PrS,
+                    pricingEngine::P = DiscountingSwapEngine(), settlementDays::I = iborIndex.fixingDays, nominal::Float64 = 1.0, swapT::ST = Payer())
   # do stuff
   fixedCal = cal
   floatingCal = cal
@@ -53,8 +75,10 @@ function VanillaSwap(rate::Float64, tenor::Base.Dates.Period, cal::BusinessCalen
 
   payer = _build_payer(swapT)
 
-  return VanillaSwap(swapT, nominal, fixed_schedule, fixed_rate, fixedDayCount, iborIndex, spread, float_schedule, floatDayCount, fixedConvention,
-                    legs, payer)
+  results = SwapResults(2)
+
+  return VanillaSwap(Quote(rate), swapT, nominal, fixed_schedule, fixed_rate, fixedDayCount, iborIndex, spread, float_schedule, floatDayCount, fixedConvention,
+                    legs, payer, pricingEngine, results, false)
 end
 
 
@@ -68,4 +92,13 @@ function _build_payer(swapT::Receiver)
   x = ones(2)
   x[2] = -1.0
   return x
+end
+
+function maturity_date{S <: Swap}(swap::S)
+  d = maturity_date(swap.legs[1])
+  for i = 2:length(swap.legs)
+    d = max(d, maturity_date(swap.legs[i]))
+  end
+
+  return d
 end

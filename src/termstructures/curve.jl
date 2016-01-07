@@ -119,9 +119,11 @@ function discount_impl{C <: InterpolatedCurve}(curve::C, t::Float64)
   # do flat fwd extrapolation
 end
 
-function _calculate!{C <: InterpolatedCurve}(curve::C)
-  calculate!(curve.boot)
-  curve.calculated = true
+function _calculate!{C <: InterpolatedCurve}(curve::C, recalculate::Bool = false)
+  if !curve.calculated || recalculate
+    curve.calculated = true
+    calculate!(curve.boot)
+  end
   return curve
 end
 

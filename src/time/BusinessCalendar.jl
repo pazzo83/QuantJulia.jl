@@ -83,8 +83,8 @@ function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(days::Day, c
   return dt
 end
 
-function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(months::Month, cal::C, dt::Date, biz_conv::B)
-  dt += months
+function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(time_period::Union{Week, Month, Year}, cal::C, dt::Date, biz_conv::B)
+  dt += time_period
   return adjust(cal, biz_conv, dt)
 end
 

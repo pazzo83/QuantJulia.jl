@@ -37,3 +37,14 @@ function TenorPeriod(p::Dates.Month)
     return TenorPeriod(p, Monthly())
   end
 end
+
+function TenorPeriod(p::Dates.Week)
+  x = Int(p)
+  if x == 26
+    return TenorPeriod(p, Biweekly())
+  elseif x == 13
+    return TenorPeriod(p, EveryFourthWeek())
+  else
+    return TenorPeriod(p, Weekly())
+  end
+end

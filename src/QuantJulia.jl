@@ -32,7 +32,7 @@ include("math/Math.jl")
 export
     # abstract_types.jl
     CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap,
-    FittingMethod, CashFlows, CashFlow, Coupon, CouponPricer, IborCouponPricer, Instrument, Bond, Swap, SwapType, PricingEngine, Duration, AbstractRate,
+    FittingMethod, CashFlows, CashFlow, Coupon, CouponPricer, IborCouponPricer, Instrument, Bond, Swap, SwapType, PricingEngine, Duration, AbstractRate, Results,
     InterestRateIndex, AbstractCurrency,
 
     # quotes/Quotes.jl
@@ -78,7 +78,7 @@ export
     # instruments/rate.jl
     DepositRate,
     # instruments/swap.jl
-    Payer, Receiver, VanillaSwap,
+    Payer, Receiver, SwapResults, VanillaSwap,
 
     # termstructures/bond_helpers.jl
     implied_quote, clean_price, dirty_price, settlement_date,
@@ -87,7 +87,7 @@ export
     implied_quote,
 
     # pricing_engines/pricing_engines.jl
-    DiscountingBondEngine, calculate
+    DiscountingBondEngine, DiscountingSwapEngine, calculate
 
 # abstract types
 include("abstract_types.jl")

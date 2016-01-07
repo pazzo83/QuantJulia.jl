@@ -2,8 +2,9 @@
 abstract Instrument
 abstract Bond <: Instrument
 abstract AbstractRate <: Instrument
-abstract Swap
+abstract Swap <: Instrument
 abstract SwapType
+abstract Results
 
 # Term Structures
 abstract TermStructure

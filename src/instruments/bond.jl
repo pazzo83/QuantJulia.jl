@@ -1,6 +1,6 @@
 using QuantJulia.Time
 
-type FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, C <: BusinessCalendar} <: Bond
+type FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, C <: BusinessCalendar, P <: PricingEngine} <: Bond
   price::Quote
   settlementDays::I
   faceAmount::Float64
@@ -14,7 +14,7 @@ type FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, C <
   startDate::Date
   maturityDate::Date
   calculated::Bool
-  pricingEngine::PricingEngine
+  pricingEngine::P
   settlementValue::Float64
 end
 
@@ -39,15 +39,15 @@ function FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention,
   return FixedRateBond(price, settlementDays, faceAmount, schedule, coups, dc, paymentConvention, redemption, calendar, issueDate, schedule.dates[1], maturityDate, false, pricing_engine, 0.0)
 end
 
-type FloatingRateBond <: Bond
-  settlementDays::Integer
+type FloatingRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, P <: PricingEngine} <: Bond
+  settlementDays::I
   faceAmount::Float64
   schedule::Schedule
   cashflows::IborLeg
   iborIndex::IborIndex
-  dc::DayCount
-  convention::BusinessDayConvention
-  fixingDays::Integer
+  dc::DC
+  convention::B
+  fixingDays::I
   gearings::Vector{Float64}
   spreads::Vector{Float64}
   caps::Vector{Float64}
@@ -57,14 +57,14 @@ type FloatingRateBond <: Bond
   issueDate::Date
   maturityDate::Date
   calculated::Bool
-  pricingEngine::PricingEngine
+  pricingEngine::P
   settlementValue::Float64
 end
 
-function FloatingRateBond(settlementDays::Integer, faceAmount::Float64, schedule::Schedule, iborIndex::IborIndex, dc::DayCount,
-                          convention::BusinessDayConvention, fixingDays::Integer, gearings::Vector{Float64}, spreads::Vector{Float64},
+function FloatingRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, P <: PricingEngine}(settlementDays::I, faceAmount::Float64, schedule::Schedule, iborIndex::IborIndex, dc::DC,
+                          convention::B, fixingDays::I, gearings::Vector{Float64}, spreads::Vector{Float64},
                           caps::Vector{Float64}, floors::Vector{Float64}, inArrears::Bool, redemption::Float64, issueDate::Date,
-                          pricingEngine::PricingEngine)
+                          pricingEngine::P)
   maturityDate = schedule.dates[end]
   fixingDaysVect = fill(fixingDays, length(schedule.dates) - 1)
 
@@ -106,6 +106,8 @@ end
 
 # bond functions
 accrued_amount{B <: Bond}(bond::B, settlement::Date) = accrued_amount(bond.cashflows, settlement, false) * 100.0 / notional(bond, settlement)
+
+maturity_date{B <: Bond}(bond::B) = maturity_date(bond.cashflows)
 
 function yield{B <: Bond, DC <: DayCount, C <: CompoundingType, F <: Frequency, I <: Integer}(bond::B, clean_price::Float64, dc::DC, compounding::C, freq::F, settlement::Date, accuracy::Float64 = 1.0e-10,
               max_iter::I = 100, guess::Float64 = 0.05)

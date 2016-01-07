@@ -13,7 +13,19 @@ type DiscountingBondEngine{Y <: YieldTermStructure} <: PricingEngine{Y}
   end
 end
 
-function calculate!{E <: DiscountingBondEngine, B <: Bond}(pe::E, bond::B, recalculate::Bool=false)
+type DiscountingSwapEngine{Y <: YieldTermStructure} <: PricingEngine{Y}
+  yts::Y
+
+  function call(::Type{DiscountingSwapEngine})
+    new{YieldTermStructure}()
+  end
+
+  function call{Y}(::Type{DiscountingSwapEngine}, yts::Y)
+    new{Y}(yts)
+  end
+end
+
+function calculate!{B <: Bond}(pe::DiscountingBondEngine, bond::B, recalculate::Bool=false)
   if bond.calculated && !recalculate
     return bond
   end
@@ -27,4 +39,33 @@ function calculate!{E <: DiscountingBondEngine, B <: Bond}(pe::E, bond::B, recal
   return bond
 end
 
+function calculate!{S <: Swap}(pe::DiscountingSwapEngine, swap::S, recalculate::Bool = false)
+  # stuff
+  swap.results.value = 0.0
+  yts = pe.yts
+
+  ref_date = yts.referenceDate
+
+  swap.results.npvDateDiscount = discount(yts, ref_date)
+
+  for (i, leg) in enumerate(swap.legs)
+    swap.results.legNPV[i], results.legBPS[i] = npvbps(leg, yts, ref_date, ref_date)
+    swap.results.legNPV[i] *= swap.payer[i]
+    swap.results.legBPS[i] *= swap.payer[i]
+
+    d1 = leg[1].accrualStartDate
+    if d1 >= ref_date
+      swap.results.startDiscounts[i] = discount(yts, d1)
+    end
+
+    d2 = leg[end].accrualEndDate
+    if (d2 >= ref_date)
+      swap.results.endDiscounts = discount(yts, d2)
+    end
+
+    swap.results.value += results.legNPV[i]
+  end
+
+  return swap
+end
 # end

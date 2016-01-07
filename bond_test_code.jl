@@ -19,15 +19,30 @@ function build_bonds(bond_mats::Vector{Date}, bond_rates::Vector{Float64}, tenor
   return bonds
 end
 
-function build_depos(depo_quotes::Vector{Float64}, depo_tenors::Vector{Base.Dates.Period}, dc::QuantJulia.Time.DayCount, conv::QuantJulia.Time.BusinessDayConvention,
-                    calendar::QuantJulia.Time.BusinessCalendar, fixing_days::Integer)
+function build_depos{P <: Dates.Period, DC <: QuantJulia.Time.DayCount, B <: QuantJulia.Time.BusinessDayConvention, C <: QuantJulia.Time.BusinessCalendar, I <: Integer}(depo_quotes::Vector{Float64}, depo_tenors::Vector{P},
+                    dc::DC, conv::B, calendar::C, fixing_days::I)
   depos = Vector{DepositRate}(length(depo_quotes))
   for i = 1:length(depo_quotes)
     depo_quote = Quote(depo_quotes[i])
-    depo_tenor = depo_tenors[i]
+    depo_tenor = QuantJulia.Time.TenorPeriod(depo_tenors[i])
     depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv, true, dc)
     depos[i] = depo
   end
+
+  return depos
+end
+
+function build_swaps{P <: Dates.Period, DC <: QuantJulia.Time.DayCount, B <: QuantJulia.Time.BusinessDayConvention, C <: QuantJulia.Time.BusinessCalendar, F <: QuantJulia.Time.Frequency, I <: Integer}(swap_quotes::Vector{Float64},
+                    swap_tenors::Vector{P}, fixed_dc::DC, fixed_conv::B, calendar::C, fixed_freq::F, float_index::IborIndex, forward_start::I)
+  forward_start_period = Dates.Day(forward_start)
+  swaps = Vector{VanillaSwap}(length(swap_quotes))
+  pricing_engine = DiscountingSwapEngine()
+
+  for i = 1:length(swap_quotes)
+    swaps[i] = VanillaSwap(swap_quotes[i], swap_tenors[i], calendar, fixed_freq, fixed_conv, fixed_dc, float_index, 0.0, forward_start_period, pricing_engine)
+  end
+
+  return swaps
 end
 
 function get_npvs(bonds, issue_date, calendar, dc, freq)
@@ -362,18 +377,43 @@ function main2()
   return npv(zcb, pricing_engine), clean_price(zcb), dirty_price(zcb)
 end
 
-function build_swaps()
+function main3()
   settlement_date = Date(2008, 9, 18)
   set_eval_date!(settings, settlement_date - Dates.Day(3))
+  cal = QuantJulia.Time.TargetCalendar()
+  dc = QuantJulia.Time.ISDAActualActual()
 
+  # Build deposits
+  depo_quotes = [0.043375, 0.031875, 0.0320375, 0.03385, 0.0338125, 0.0335125]
+  depo_tenors = [Dates.Week(1), Dates.Month(1), Dates.Month(3), Dates.Month(6), Dates.Month(9), Dates.Year(1)]
+  deposit_dc = QuantJulia.Time.Actual360()
+  fixing_days = 3
+  biz_conv = QuantJulia.Time.ModifiedFollowing()
+
+  depos = build_depos(depo_quotes, depo_tenors, deposit_dc, biz_conv, cal, fixing_days)
+
+  # build swaps
   fixedLegFreq = QuantJulia.Time.Annual()
   fixedLegConv = QuantJulia.Time.Unadjusted()
   fixedLegDC = QuantJulia.Time.EuroThirty360()
   floatingLegIndex = euribor_index(QuantJulia.Time.TenorPeriod(Base.Dates.Month(6)))
-  forwardStart = Base.Dates.Day(1)
-  cal = QuantJulia.Time.TargetCalendar()
+  forwardStart = 1
 
-  test_swap = VanillaSwap(0.025, Base.Dates.Year(2), cal, fixedLegFreq, fixedLegConv, fixedLegDC, floatingLegIndex, 0.0, forwardStart)
+  swap_quotes = [0.0295, 0.0323, 0.0359, 0.0412, 0.0433]
+  swap_tenors = [Dates.Year(2), Dates.Year(3), Dates.Year(5), Dates.Year(10), Dates.Year(15)]
 
-  return test_swap
+  swaps = build_swaps(swap_quotes, swap_tenors, fixedLegDC, fixedLegConv, cal, fixedLegFreq, floatingLegIndex, forwardStart)
+
+  insts = Vector{Instrument}(length(swap_quotes) + length(depo_quotes))
+
+  insts[1:length(depo_quotes)] = depos
+  insts[length(depo_quotes) + 1: end] = swaps
+
+  interp = QuantJulia.Math.LogInterpolation()
+  trait = Discount()
+  bootstrap = IterativeBootstrap()
+
+  yts = PiecewiseYieldCurve(settlement_date, insts, dc, interp, trait, 1e-15, bootstrap)
+
+  return yts
 end
