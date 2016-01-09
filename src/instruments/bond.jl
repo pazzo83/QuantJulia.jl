@@ -34,7 +34,7 @@ function FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention,
   # add redemption
   # coups[end] = SimpleCashFlow(redemption, maturityDate)
 
-  coups = FixedRateLeg(schedule, faceAmount, coup_rate, calendar, paymentConvention, dc)
+  coups = FixedRateLeg{FixedRateCoupon, SimpleCashFlow}(schedule, faceAmount, coup_rate, calendar, paymentConvention, dc)
 
   return FixedRateBond(price, settlementDays, faceAmount, schedule, coups, dc, paymentConvention, redemption, calendar, issueDate, schedule.dates[1], maturityDate, false, pricing_engine, 0.0)
 end

@@ -155,9 +155,9 @@ function initialize!(curve::FittedBondDiscountCurve)
     squared_sum += curve.fittingMethod.commons.weights[i] * curve.fittingMethod.commons.weights[i]
 
     cf = bond.cashflows
-    for k = 1:length(cf.coupons) + 1 # for redemption
-      cf_to_use = k > length(cf.coupons) ? cf.redemption : cf.coupons[i]
-      if !has_occurred(cf_to_use, bond_settlement)
+    for k = 1:length(cf.coupons) # for redemption
+      # cf_to_use = k > length(cf.coupons) ? cf.redemption : cf.coupons[i]
+      if !has_occurred(cf.coupons[i], bond_settlement)
         cost_f.firstCashFlow[i] = k
         break
       end
@@ -222,7 +222,7 @@ function value{C <: CostFunction, T}(cf::C, x::Vector{T})
     end
 
     # redemption
-    @inbounds model_price += amount(leg.redemption) * discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.redemption)))
+    # @inbounds model_price += amount(leg.redemption) * discount_function(cf.curve.fittingMethod, x, year_fraction(dc, ref_date, date(leg.redemption)))
 
     # adjust NPV for forward settlement
     if bond_settlement != ref_date

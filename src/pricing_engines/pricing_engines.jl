@@ -41,29 +41,31 @@ end
 
 function calculate!{S <: Swap}(pe::DiscountingSwapEngine, swap::S, recalculate::Bool = false)
   # stuff
-  swap.results.value = 0.0
-  yts = pe.yts
+  if !swap.calculated || recalculate
+    swap.results.value = 0.0
+    yts = pe.yts
 
-  ref_date = yts.referenceDate
+    ref_date = yts.referenceDate
 
-  swap.results.npvDateDiscount = discount(yts, ref_date)
+    swap.results.npvDateDiscount = discount(yts, ref_date)
 
-  for (i, leg) in enumerate(swap.legs)
-    swap.results.legNPV[i], results.legBPS[i] = npvbps(leg, yts, ref_date, ref_date)
-    swap.results.legNPV[i] *= swap.payer[i]
-    swap.results.legBPS[i] *= swap.payer[i]
+    for (i, leg) in enumerate(swap.legs)
+      swap.results.legNPV[i], swap.results.legBPS[i] = npvbps(leg, yts, ref_date, ref_date)
+      swap.results.legNPV[i] *= swap.payer[i]
+      swap.results.legBPS[i] *= swap.payer[i]
 
-    d1 = leg[1].accrualStartDate
-    if d1 >= ref_date
-      swap.results.startDiscounts[i] = discount(yts, d1)
+      d1 = leg.coupons[1].accrualStartDate
+      if d1 >= ref_date
+        swap.results.startDiscounts[i] = discount(yts, d1)
+      end
+
+      d2 = leg.coupons[end].accrualEndDate
+      if (d2 >= ref_date)
+        swap.results.endDiscounts[i] = discount(yts, d2)
+      end
+
+      swap.results.value += swap.results.legNPV[i]
     end
-
-    d2 = leg[end].accrualEndDate
-    if (d2 >= ref_date)
-      swap.results.endDiscounts = discount(yts, d2)
-    end
-
-    swap.results.value += results.legNPV[i]
   end
 
   return swap

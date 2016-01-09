@@ -10,7 +10,7 @@ const BASIS_POINT = 0.0001
 type BlackIborCouponPricer{O <: OptionletVolatilityStructure} <: IborCouponPricer
   discount::Float64
   spreadLegValue::Float64
-  accural_period::Float64
+  accrual_period::Float64
   initialized::Bool
   capletVolatility::O
 
@@ -33,6 +33,7 @@ end
 
 amount(cf::SimpleCashFlow) = cf.amount
 date(cf::SimpleCashFlow) = cf.date
+date_accrual_end(cf::SimpleCashFlow) = cf.date
 
 type FixedRateCoupon{DC <: DayCount} <: Coupon
   paymentDate::Date
@@ -93,10 +94,11 @@ end
 amount(coup::FixedRateCoupon) =
         coup.nominal * (compound_factor(coup.rate, coup.accrualStartDate, coup.accrualEndDate, coup.refPeriodStart, coup.refPeriodEnd) - 1)
 
-amount(coup::IborCoupon) = calc_rate(coup)
-date(coup::Coupon) = coup.paymentDate
+amount(coup::IborCoupon) = calc_rate(coup) * accrual_period(coup) * coup.nominal
+date{C <: Coupon}(coup::C) = coup.paymentDate
+date_accrual_end{C <: Coupon}(coup::C) = coup.accrualEndDate
 
-function calc_rate{Y <: YieldTermStructure}(coup::IborCoupon, yts::Y)
+function calc_rate(coup::IborCoupon)
   initialize!(coup.pricer, coup)
   return swaplet_rate(coup.pricer, coup)
 end
@@ -105,7 +107,7 @@ function index_fixing(coupon::IborCoupon)
   today = settings.evaluation_date
 
   if coupon.fixingDate > today
-    return forecast_fixing(coupon.iborIndex, coupon.iborIndex.yts, coupon.fixingValueDate, coupon.fixingEndDate, coupon.spanningTime)
+    return forecast_fixing(coupon.iborIndex, coupon.iborIndex.ts, coupon.fixingValueDate, coupon.fixingEndDate, coupon.spanningTime)
   end
 
   error("Fixing date on or before eval date")
@@ -114,12 +116,13 @@ end
 # legs to build cash flows
 abstract Leg <: CashFlows
 
-type FixedRateLeg <: Leg
-  coupons::Vector{FixedRateCoupon}
-  redemption::SimpleCashFlow
+type FixedRateLeg{F <: FixedRateCoupon, S <: SimpleCashFlow} <: Leg
+  coupons::Vector{Union{F, S}}
+  # redemption::SimpleCashFlow
 
-  function FixedRateLeg{B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount}(schedule::Schedule, faceAmount::Float64, rate::Float64, calendar::B, paymentConvention::C, dc::DC)
-    coups = Vector{FixedRateCoupon}(length(schedule.dates) - 1)
+  function FixedRateLeg{B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount}(schedule::Schedule, faceAmount::Float64, rate::Float64, calendar::B, paymentConvention::C, dc::DC, add_redemption::Bool = true)
+    n = add_redemption ? length(schedule.dates) : length(schedule.dates) - 1
+    coups = Vector{CashFlow}(n)
 
     start_date = schedule.dates[1]
     end_date = schedule.dates[2]
@@ -139,9 +142,11 @@ type FixedRateLeg <: Leg
       end_date = count == length(schedule.dates) ? schedule.dates[end] : schedule.dates[count + 1]
     end
 
-    redemption = SimpleCashFlow(faceAmount, end_date)
+    if add_redemption
+      @inbounds coups[end] = SimpleCashFlow(faceAmount, end_date)
+    end
 
-    new(coups, redemption)
+    new(coups)
   end
 end
 
@@ -227,7 +232,7 @@ end
 
 function swaplet_price(pricer::BlackIborCouponPricer, coup::IborCoupon)
   _swaplet_price = adjusted_fixing(pricer, coup) * pricer.accrual_period * pricer.discount
-  return coup.gearing * _swaplet_price * pricer.spreadLegValue
+  return coup.gearing * _swaplet_price + pricer.spreadLegValue
 end
 
 function swaplet_rate(pricer::BlackIborCouponPricer, coup::IborCoupon)
@@ -407,7 +412,7 @@ function npvbps{L <: Leg, Y <: YieldTermStructure}(leg::L, yts::Y, settlement_da
     df = discount(yts, date(cp))
     npv += amount(cp) * df
     if isa(cp, Coupon)
-      bps += cp.nominal * accural_period(cp) * df
+      bps += cp.nominal * accrual_period(cp) * df
     end
   end
   d = discount(yts, npv_date)
@@ -478,8 +483,13 @@ end
 
 # functions for sorting and finding
 sort_cashflow{C <: Coupon}(cf::C) = cf.accrualEndDate
+sort_cashflow(simp::SimpleCashFlow) = simp.date
+
 prev_cf{C <: Coupon}(cf::C, d::Date) = d > cf.paymentDate
+prev_cf(simp::SimpleCashFlow) = d > simp.date
+
 next_cf{C <: Coupon}(cf::C, d::Date) = d < cf.paymentDate
+next_cf(simp::SimpleCashFlow) = d < simp.date
 
 function previous_cashflow_date(cf::FixedRateLeg, settlement_date::Date)
   # right now we can assume cashflows are sorted by date because of schedule
@@ -499,7 +509,7 @@ function accrual_days{C <: CashFlows, DC <: DayCount}(cf::C, dc::DC, settlement_
 end
 
 function next_cashflow{L <: Leg}(cf::L, settlement_date::Date)
-  if settlement_date > cf.coupons[end].paymentDate
+  if settlement_date > date(cf.coupons[end])
     return length(cf.coupons)
   end
 
@@ -512,20 +522,21 @@ function accrued_amount(cf::FixedRateLeg, settlement_date::Date, include_settlem
     return 0.0
   end
 
-  next_cf = cf.coupons[next_cf_idx]
-  paymentDate = next_cf.paymentDate
+  _next_cf = cf.coupons[next_cf_idx]
+  paymentDate = date(_next_cf)
   result = 0.0
   i = next_cf_idx
-  while i < length(cf.coupons) && next_cf.paymentDate == paymentDate
-    result += accrued_amount(next_cf, settlement_date)
+  while i < length(cf.coupons) && date(_next_cf) == paymentDate
+    result += accrued_amount(_next_cf, settlement_date)
     i += 1
-    next_cf = cf.coupons[i]
+    _next_cf = cf.coupons[i]
   end
 
   return result
 end
 
 accrued_amount(cf::ZeroCouponLeg, ::Date, ::Bool= false) = 0.0
+accrued_amount(simp::SimpleCashFlow, ::Date, ::Bool = false) = 0.0
 
 function accrued_amount(coup::FixedRateCoupon, settlement_date::Date)
   if settlement_date <= coup.accrualStartDate || settlement_date > coup.paymentDate
@@ -550,7 +561,7 @@ end
 function maturity_date{L <: Leg}(leg::L)
   # sort cashflows
   sorted_cf = sort(leg.coupons, by=sort_cashflow)
-  return sorted_cf[end].accrualEndDate
+  return date_accrual_end(sorted_cf[end])
 end
 
 # Yield Calculations ##
@@ -564,15 +575,19 @@ end
 
 ## ITERATORS ##
 # this is to iterate through cash flows and redemption
-Base.start(f::FixedRateLeg) = 1
-function Base.next(f::FixedRateLeg, state)
-  if state > length(f.coupons)
-    f.redemption, state + 1
-  else
-    f.coupons[state], state + 1
-  end
-end
+# Base.start(f::FixedRateLeg) = 1
+# function Base.next(f::FixedRateLeg, state)
+#   if state > length(f.coupons)
+#     f.redemption, state + 1
+#   else
+#     f.coupons[state], state + 1
+#   end
+# end
+#
+# Base.done(f::FixedRateLeg, state) = length(f.coupons) + 1 < state
 
-Base.done(f::FixedRateLeg, state) = length(f.coupons) + 1 < state
+Base.start{L <: Leg}(f::L) = 1
+Base.next{L <: Leg}(f::L, state) = f.coupons[state], state + 1
+Base.done{L <: Leg}(f::L, state) = length(f.coupons) == state - 1
 
 # end

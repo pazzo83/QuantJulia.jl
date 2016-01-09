@@ -69,7 +69,7 @@ function VanillaSwap{PrT <: Dates.Period, C <: BusinessCalendar, F <: Frequency,
   # build swap cashflows
   legs = Vector{Leg}(2)
   # first leg is fixed
-  legs[1] = FixedRateLeg(fixed_schedule, nominal, fixed_rate, fixedCal, floatConvention, fixedDayCount)
+  legs[1] = FixedRateLeg(fixed_schedule, nominal, fixed_rate, fixedCal, floatConvention, fixedDayCount, false)
   # second leg is floating
   legs[2] = IborLeg(float_schedule, nominal, iborIndex, floatDayCount, floatConvention)
 
@@ -102,3 +102,8 @@ function maturity_date{S <: Swap}(swap::S)
 
   return d
 end
+
+floating_leg_NPV(swap::VanillaSwap) = swap.results.legNPV[2]
+floating_leg_BPS(swap::VanillaSwap) = swap.results.legBPS[2]
+
+fixed_leg_BPS(swap::VanillaSwap) = swap.results.legBPS[1]

@@ -47,7 +47,12 @@ get_pricing_engine{Y}(::Discount, yts::Y) = DiscountingBondEngine(yts)
 
 apply_termstructure!{R <: AbstractRate, T <: TermStructure}(rate::R, ts::T) = rate.iborIndex.ts = ts
 apply_termstructure!{B <: Bond, T <: TermStructure}(b::B, ts::T) = b.pricingEngine.yts = ts
-apply_termstructure!{S <: Swap, T <: TermStructure}(s::S, ts::T) = s.iborIndex.ts = ts
+function apply_termstructure!{S <: Swap, T <: TermStructure}(s::S, ts::T)
+  s.iborIndex.ts = ts
+  s.pricingEngine.yts = ts
+
+  return s
+end
 
 # BOOTSTRAPPING
 type IterativeBootstrap <: Bootstrap end
@@ -149,4 +154,5 @@ function bootstrap_error{I <: Integer, T <: Instrument, Y <: YieldTermStructure}
 end
 
 quote_error{B <: Bond}(inst::B) = QuantJulia.value(inst) - implied_quote(inst, true) # recalculate
-quote_error(rate::AbstractRate) = rate.rate.value - implied_quote(rate, rate.iborIndex.ts)
+quote_error{R <: AbstractRate}(rate::R) = rate.rate.value - implied_quote(rate, rate.iborIndex.ts)
+quote_error{S <: Swap}(swap::S) = swap.rate.value - implied_quote(swap)
