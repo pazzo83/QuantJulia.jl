@@ -70,8 +70,14 @@ export
     ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, CubicBSplinesFitting, discount_function, guess_size,
 
     # cash_flows/cash_flows.jl
-    BlackIborCouponPricer, SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
-    accrual_days, accrual_days, next_cashflow, has_occurred, update_pricer!, 
+    SimpleCashFlow, Leg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
+    accrual_days, accrual_days, next_cashflow, has_occurred, next_coupon_rate, 
+
+    # cash_flows/fixed_rate_coupon.jl
+    FixedRateCoupon, FixedRateLeg,
+
+    # cash_flows/floating_rate_coupon.jl
+    BlackIborCouponPricer, IborCoupon, IborLeg, update_pricer!,
 
     # instruments/bond.jl
     FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv,
@@ -117,6 +123,8 @@ include("termstructures/bootstrap.jl")
 
 # Cash Flows ------------------------------------
 include("cash_flows/cash_flows.jl")
+include("cash_flows/fixed_rate_coupon.jl")
+include("cash_flows/floating_rate_coupon.jl")
 
 # Instruments ------------------------
 # bond

@@ -253,6 +253,22 @@ function generate_floatingrate_bond()
   return floating_bond
 end
 
+function generate_fixedrate_bond()
+  settlement_days = 3
+  face_amount = 100.0
+
+  fx_schedule = QuantJulia.Time.Schedule(Date(2007, 5, 15), Date(2017, 5, 15), QuantJulia.Time.TenorPeriod(QuantJulia.Time.Semiannual()),
+                                        QuantJulia.Time.Unadjusted(), QuantJulia.Time.Unadjusted(), QuantJulia.Time.DateGenerationBackwards(), false,
+                                        QuantJulia.Time.USGovernmentBondCalendar())
+
+  pe = DiscountingBondEngine()
+
+  fixedrate_bond = FixedRateBond(Quote(face_amount), settlement_days, face_amount, fx_schedule, 0.045, QuantJulia.Time.ISMAActualActual(), QuantJulia.Time.ModifiedFollowing(),
+                                100.0, Date(2007, 5, 15), fx_schedule.cal, pe)
+
+  return fixedrate_bond
+end
+
 function generate_discounting_ts(sett::Date)
   settlement_date = sett
   freq = QuantJulia.Time.Semiannual()
@@ -452,6 +468,7 @@ function main3()
 
   disc_yts = generate_discounting_ts(settlement_date)
 
+  # Floating Rate Bond
   fb = generate_floatingrate_bond()
 
   cap_vol = ConstantOptionVolatility(3, cal, QuantJulia.Time.ModifiedFollowing(), 0.0, QuantJulia.Time.Actual365())
@@ -460,5 +477,31 @@ function main3()
   fb.iborIndex.ts = yts
   fb.pricingEngine.yts = disc_yts
 
-  return npv(fb, fb.pricingEngine), clean_price(fb), dirty_price(fb)
+  # Zero Coupon Bond
+  zcb_pe = DiscountingBondEngine(disc_yts)
+  zcb_cal = QuantJulia.Time.USGovernmentBondCalendar()
+
+  # build zero coupon bond
+  zcb = ZeroCouponBond(3, zcb_cal, 100.0, Date(2013, 8, 15), QuantJulia.Time.Following(), 116.92, Date(2003, 8, 15), zcb_pe)
+
+  # fixed rate bond
+  fxb = generate_fixedrate_bond()
+  fxb.pricingEngine.yts = disc_yts
+
+  println("Today's date: ", settings.evaluation_date)
+  println("Settlement date: ", settlement_date)
+  println("")
+  println("              ZC      Fixed    Floating  ")
+  println("-----------------------------------------")
+  println(@sprintf("  NPV       %.2f   %.2f   %.2f", npv(zcb, zcb.pricingEngine), npv(fxb, fxb.pricingEngine), npv(fb, fb.pricingEngine)))
+  println(@sprintf(" Clean      %.2f   %.2f   %.2f", clean_price(zcb), clean_price(fxb), clean_price(fb)))
+  println(@sprintf(" Dirty      %.2f   %.2f   %.2f", dirty_price(zcb), dirty_price(fxb), dirty_price(fb)))
+  println(@sprintf("accrued      %.2f     %.2f     %.2f", accrued_amount(zcb, settlement_date), accrued_amount(fxb, settlement_date), accrued_amount(fb, settlement_date)))
+  println(@sprintf(" Next C      N/A      %.2f%%    %.2f%%", next_coupon_rate(fxb.cashflows, settlement_date) * 100.0, next_coupon_rate(fb.cashflows, settlement_date) * 100.0))
+  println(@sprintf(" Yield      %.2f%%    %.2f%%    %.2f%%",
+          QuantJulia.yield(zcb, clean_price(zcb), QuantJulia.Time.Actual360(), CompoundedCompounding(), QuantJulia.Time.Annual(), settlement_date) * 100.0,
+          QuantJulia.yield(fxb, clean_price(fxb), QuantJulia.Time.Actual360(), CompoundedCompounding(), QuantJulia.Time.Annual(), settlement_date) * 100.0,
+          QuantJulia.yield(fb, clean_price(fb), QuantJulia.Time.Actual360(), CompoundedCompounding(), QuantJulia.Time.Annual(), settlement_date) * 100.0))
+
+  # return npv(fb, fb.pricingEngine), clean_price(fb), dirty_price(fb), QuantJulia.yield(fb, clean_price(fb), QuantJulia.Time.Actual360(), CompoundedCompounding(), QuantJulia.Time.Annual(), settlement_date), next_coupon_rate(fb.cashflows, settlement_date)
 end
