@@ -24,8 +24,8 @@ type Schedule{B <: BusinessDayConvention, D <: DateGenerationRule, C <: Business
   end
 end
 
-function Schedule{B <: BusinessDayConvention, D <: DateGenerationRule, C <: BusinessCalendar}(effectiveDate::Date, terminationDate::Date, tenor::TenorPeriod, convention::B, termDateConvention::B,
-  rule::D, endOfMonth::Bool, cal::C = TargetCalendar())
+function Schedule{B <: BusinessDayConvention, C <: BusinessCalendar}(effectiveDate::Date, terminationDate::Date, tenor::TenorPeriod, convention::B, termDateConvention::B,
+  rule::DateGenerationForwards, endOfMonth::Bool, cal::C = TargetCalendar())
   # dt = effectiveDate
   # num_dates = 1
   #
@@ -59,11 +59,11 @@ function Schedule{B <: BusinessDayConvention, D <: DateGenerationRule, C <: Busi
 
   push!(dates, terminationDate)
 
-  return Schedule{B, D, C}(effectiveDate, terminationDate, tenor, convention, termDateConvention, rule, endOfMonth, dates, cal)
+  return Schedule{B, DateGenerationForwards, C}(effectiveDate, terminationDate, tenor, convention, termDateConvention, rule, endOfMonth, dates, cal)
 end
 
-function Schedule{B <: BusinessDayConvention, D <: DateGenerationRule, C <: BusinessCalendar}(effectiveDate::Date, terminationDate::Date, tenor::TenorPeriod, convention::B, termDateConvention::B,
-  rule::D, endOfMonth::Bool, cal::C = TargetCalendar())
+function Schedule{B <: BusinessDayConvention, C <: BusinessCalendar}(effectiveDate::Date, terminationDate::Date, tenor::TenorPeriod, convention::B, termDateConvention::B,
+  rule::DateGenerationBackwards, endOfMonth::Bool, cal::C = TargetCalendar())
   size = get_size(tenor.period, effectiveDate, terminationDate)
   dates = Vector{Date}(size)
   dates[1] = effectiveDate
@@ -71,7 +71,7 @@ function Schedule{B <: BusinessDayConvention, D <: DateGenerationRule, C <: Busi
   dates[end] = terminationDate
   period = 1
   for i = size - 1:-1:2
-    dates[i] = terminationDate - period * tenor.period
+    dates[i] = adjust(cal, convention, terminationDate - period * tenor.period)
     period += 1
   end
   # dt = effectiveDate
@@ -89,7 +89,7 @@ function Schedule{B <: BusinessDayConvention, D <: DateGenerationRule, C <: Busi
   #
   # insert!(dates, 1, effectiveDate)
 
-  return Schedule{B, D, C}(effectiveDate, terminationDate, tenor, convention, termDateConvention, rule, endOfMonth, dates, cal)
+  return Schedule{B, DateGenerationBackwards, C}(effectiveDate, terminationDate, tenor, convention, termDateConvention, rule, endOfMonth, dates, cal)
 end
 
 # helpers

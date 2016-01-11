@@ -46,7 +46,7 @@ export
     InterestRate, discount_factor, compound_factor, equivalent_rate, implied_rate,
 
     # Indexes
-    IborIndex, fixing_date, maturity_date, fixing, forecast_fixing, euribor_index,
+    IborIndex, LiborIndex, fixing_date, maturity_date, fixing, forecast_fixing, euribor_index, usd_libor_index,
 
     # termstructures/TermStructures.jl
     check_range, max_date, time_from_reference,
@@ -71,7 +71,7 @@ export
 
     # cash_flows/cash_flows.jl
     BlackIborCouponPricer, SimpleCashFlow, FixedRateCoupon, Leg, FixedRateLeg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
-    accrual_days, accrual_days, next_cashflow, has_occurred,
+    accrual_days, accrual_days, next_cashflow, has_occurred, update_pricer!, 
 
     # instruments/bond.jl
     FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv,

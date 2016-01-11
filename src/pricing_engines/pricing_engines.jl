@@ -42,6 +42,10 @@ end
 function calculate!{S <: Swap}(pe::DiscountingSwapEngine, swap::S, recalculate::Bool = false)
   # stuff
   if !swap.calculated || recalculate
+    # println("NEW ONE=============================================================================")
+    # if swap.rate.value > 0.0323
+    #   error("DUIE")
+    # end
     swap.results.value = 0.0
     yts = pe.yts
 

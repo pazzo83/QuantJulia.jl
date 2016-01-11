@@ -35,7 +35,9 @@ function min_value_after{I <: Integer, T <: TermStructure}(::Discount, i::I, ts:
 end
 
 function max_value_after{I <: Integer, T <: TermStructure}(::Discount, i::I, ts::T)
-  return ts.data[i - 1]
+  dt = ts.times[i] - ts.times[i - 1]
+  return ts.data[i - 1] * exp(max_rate * dt)
+  #return ts.data[i - 1]
 end
 
 function update_guess!{I <: Integer, T <: TermStructure}(::Discount, i::I, ts::T, discount::Float64)
@@ -112,7 +114,8 @@ function calculate!{T <: TermStructure, S <: Solver1D, SS <: Solver1D}(::Bootstr
       end
 
       if !valid_data
-        update!(ts.interp, i)
+        update_idx = i == length(ts.data) ? 1 : i + 1
+        update!(ts.interp, update_idx, ts.data[1])
       end
 
       # put this in a try / catch
@@ -147,6 +150,11 @@ function bootstrap_error{I <: Integer, T <: Instrument, Y <: YieldTermStructure}
     # update trait
     update_guess!(ts.trait, i, ts, g)
     update!(ts.interp, i, g)
+    # qe =
+    # if i > 7
+    #   println("GUESS: $i : $g")
+    #   println("QUOTE ERROR ", qe)
+    # end
     return quote_error(inst)
   end
 

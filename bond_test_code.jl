@@ -232,6 +232,85 @@ function fitted_bond_curve_all()
   println("Svensson Fitting: $(sf_fitted_curve.fittingMethod.commons.numberOfIterations)")
 end
 
+function generate_floatingrate_bond()
+  # Floating Rate bond
+  settlement_days = 3
+  face_amount = 100.0
+  fb_issue_date = Date(2005, 10, 21)
+  bond_engine = DiscountingBondEngine()
+  fb_dc = QuantJulia.Time.Actual360()
+  conv = QuantJulia.Time.ModifiedFollowing()
+  fb_schedule = QuantJulia.Time.Schedule(Date(2005, 10, 21), Date(2010, 10, 21), QuantJulia.Time.TenorPeriod(QuantJulia.Time.Quarterly()),
+                                        QuantJulia.Time.Unadjusted(), QuantJulia.Time.Unadjusted(), QuantJulia.Time.DateGenerationBackwards(), false,
+                                        QuantJulia.Time.USNYSECalendar())
+  fixing_days = 2
+  in_arrears = true
+  gearings = ones(length(fb_schedule.dates) - 1)
+  spreads = fill(0.001, length(fb_schedule.dates) - 1)
+  libor_3m = usd_libor_index(QuantJulia.Time.TenorPeriod(Base.Dates.Month(3)))
+  floating_bond = FloatingRateBond(settlement_days, face_amount, fb_schedule, libor_3m, fb_dc, conv, fixing_days, fb_issue_date, bond_engine, in_arrears, 100.0, gearings, spreads)
+
+  return floating_bond
+end
+
+function generate_discounting_ts(sett::Date)
+  settlement_date = sett
+  freq = QuantJulia.Time.Semiannual()
+  tenor = QuantJulia.Time.TenorPeriod(freq)
+  conv = QuantJulia.Time.Unadjusted()
+  conv_depo = QuantJulia.Time.ModifiedFollowing()
+  rule = QuantJulia.Time.DateGenerationBackwards()
+  calendar = QuantJulia.Time.USGovernmentBondCalendar()
+  dc_depo = QuantJulia.Time.Actual365()
+  dc = QuantJulia.Time.ISDAActualActual()
+  dc_bond = QuantJulia.Time.ISMAActualActual()
+  fixing_days = 3
+
+  # build depos
+  depo_rates = [0.0096, 0.0145, 0.0194]
+  depo_tens = [Base.Dates.Month(3), Base.Dates.Month(6), Base.Dates.Month(12)]
+
+  # build bonds
+  issue_dates = [Date(2005, 3, 15), Date(2005, 6, 15), Date(2006, 6, 30), Date(2002, 11, 15), Date(1987, 5, 15)]
+  mat_dates = [Date(2010, 8, 31), Date(2011, 8, 31), Date(2013, 8, 31), Date(2018, 8, 15), Date(2038, 5, 15)]
+
+  coupon_rates = [0.02375, 0.04625, 0.03125, 0.04000, 0.04500]
+  market_quotes = [100.390625, 106.21875, 100.59375, 101.6875, 102.140625]
+
+  insts = Vector{Instrument}(length(depo_rates) + length(issue_dates))
+  for i = 1:length(depo_rates)
+    depo_quote = Quote(depo_rates[i])
+    depo_tenor = QuantJulia.Time.TenorPeriod(depo_tens[i])
+    depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv_depo, true, dc_depo)
+    insts[i] = depo
+  end
+
+  pricing_engine = DiscountingBondEngine()
+
+  for i =1:length(coupon_rates)
+    term_date = mat_dates[i]
+    # rate = bond_rates[i] / 100
+    rate = coupon_rates[i]
+    issue_date = issue_dates[i]
+    market_quote = market_quotes[i]
+    sched = QuantJulia.Time.Schedule(issue_date, term_date, tenor, conv, conv, rule, true)
+    bond = FixedRateBond(Quote(market_quote), 3, 100.0, sched, rate, dc_bond, conv, 100.0, issue_date, calendar, pricing_engine)
+    insts[i + length(depo_rates)] = bond
+  end
+
+  interp = QuantJulia.Math.LogInterpolation()
+  trait = Discount()
+  bootstrap = IterativeBootstrap()
+
+  yts = PiecewiseYieldCurve(settlement_date, insts, dc, interp, trait, 0.00000000001, bootstrap)
+
+  solver = QuantJulia.Math.BrentSolver()
+  solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
+  calculate!(bootstrap, yts, solver2, solver)
+
+  return yts
+end
+
 function main()
   issue_date, bonds, dc, calendar = setup()
 
@@ -314,67 +393,19 @@ end
 
 function main2()
   settlement_date = Date(2008, 9, 18)
-  set_eval_date!(settings, settlement_date - Base.Dates.Day(3))
-  freq = QuantJulia.Time.Semiannual()
-  tenor = QuantJulia.Time.TenorPeriod(freq)
-  conv = QuantJulia.Time.Unadjusted()
-  conv_depo = QuantJulia.Time.ModifiedFollowing()
-  rule = QuantJulia.Time.DateGenerationBackwards()
   calendar = QuantJulia.Time.USGovernmentBondCalendar()
-  dc_depo = QuantJulia.Time.Actual365()
-  dc = QuantJulia.Time.ISDAActualActual()
-  dc_bond = QuantJulia.Time.ISMAActualActual()
-  fixing_days = 3
+  set_eval_date!(settings, settlement_date - Base.Dates.Day(3))
 
-  # build depos
-  depo_rates = [0.0096, 0.0145, 0.0194]
-  depo_tens = [Base.Dates.Month(3), Base.Dates.Month(6), Base.Dates.Month(12)]
-
-  # build bonds
-  issue_dates = [Date(2005, 3, 15), Date(2005, 6, 15), Date(2006, 6, 30), Date(2002, 11, 15), Date(1987, 5, 15)]
-  mat_dates = [Date(2010, 8, 31), Date(2011, 8, 31), Date(2013, 8, 31), Date(2018, 8, 15), Date(2038, 5, 15)]
-
-  coupon_rates = [0.02375, 0.04625, 0.03125, 0.04000, 0.04500]
-  market_quotes = [100.390625, 106.21875, 100.59375, 101.6875, 102.140625]
-
-  insts = Vector{Instrument}(length(depo_rates) + length(issue_dates))
-  for i = 1:length(depo_rates)
-    depo_quote = Quote(depo_rates[i])
-    depo_tenor = QuantJulia.Time.TenorPeriod(depo_tens[i])
-    depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv_depo, true, dc_depo)
-    insts[i] = depo
-  end
-
-  pricing_engine = DiscountingBondEngine()
-
-  for i =1:length(coupon_rates)
-    term_date = mat_dates[i]
-    # rate = bond_rates[i] / 100
-    rate = coupon_rates[i]
-    issue_date = issue_dates[i]
-    market_quote = market_quotes[i]
-    sched = QuantJulia.Time.Schedule(issue_date, term_date, tenor, conv, conv, rule, true)
-    bond = FixedRateBond(Quote(market_quote), 3, 100.0, sched, rate, dc_bond, conv, 100.0, issue_date, calendar, pricing_engine)
-    insts[i + length(depo_rates)] = bond
-  end
-
-  interp = QuantJulia.Math.LogInterpolation()
-  trait = Discount()
-  bootstrap = IterativeBootstrap()
-
-  yts = PiecewiseYieldCurve(settlement_date, insts, dc, interp, trait, 0.00000000001, bootstrap)
-
-  solver = QuantJulia.Math.BrentSolver()
-  solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
-  calculate!(bootstrap, yts, solver2, solver)
+  yts = generate_discounting_ts(settlement_date)
+  pe = DiscountingBondEngine(yts)
 
   # build zero coupon bond
-  zcb = ZeroCouponBond(3, calendar, 100.0, Date(2013, 8, 15), QuantJulia.Time.Following(), 116.92, Date(2003, 8, 15))
+  zcb = ZeroCouponBond(3, calendar, 100.0, Date(2013, 8, 15), QuantJulia.Time.Following(), 116.92, Date(2003, 8, 15), pe)
 
   # println(npv(zcb, pricing_engine, yts))
   # println(clean_price(zcb))
   # println(dirty_price(zcb))
-  return npv(zcb, pricing_engine), clean_price(zcb), dirty_price(zcb)
+  return npv(zcb, zcb.pricingEngine), clean_price(zcb), dirty_price(zcb)
 end
 
 function main3()
@@ -419,5 +450,15 @@ function main3()
   solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
   calculate!(bootstrap, yts, solver2, solver)
 
-  return yts
+  disc_yts = generate_discounting_ts(settlement_date)
+
+  fb = generate_floatingrate_bond()
+
+  cap_vol = ConstantOptionVolatility(3, cal, QuantJulia.Time.ModifiedFollowing(), 0.0, QuantJulia.Time.Actual365())
+  update_pricer!(fb.cashflows, cap_vol)
+
+  fb.iborIndex.ts = yts
+  fb.pricingEngine.yts = disc_yts
+
+  return npv(fb, fb.pricingEngine), clean_price(fb), dirty_price(fb)
 end

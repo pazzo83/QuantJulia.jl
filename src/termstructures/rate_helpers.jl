@@ -7,6 +7,11 @@ end
 function implied_quote{S <: Swap}(swap::S)
   const basisPoint = 0.0001
   calculate!(swap.pricingEngine, swap, true)
+  #
+  # println("Floating Leg NPV ", floating_leg_NPV(swap))
+  # println("Floating Leg BPS ", floating_leg_BPS(swap))
+  # println("Fixed Leg BPS ", fixed_leg_BPS(swap))
+  # println("Swap spread ", swap.spread)
 
   floatingLegNPV = floating_leg_NPV(swap)
   spread = swap.spread

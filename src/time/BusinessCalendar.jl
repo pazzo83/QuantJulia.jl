@@ -9,6 +9,11 @@ abstract OrthodoxCalendar <: BusinessCalendar
 # target calendar
 type TargetCalendar <: BusinessCalendar end
 
+type JointCalendar{B <: BusinessCalendar, C <: BusinessCalendar} <: BusinessCalendar
+  cal1::B
+  cal2::C
+end
+
 # US Calendars
 abstract UnitedStatesCalendar <: WesternCalendar
 
@@ -16,6 +21,13 @@ type USSettlementCalendar <: UnitedStatesCalendar; end
 type USNYSECalendar <: UnitedStatesCalendar; end
 type USNERCCalendar <: UnitedStatesCalendar; end
 type USGovernmentBondCalendar <: UnitedStatesCalendar; end
+
+# UK Calendars
+abstract UnitedKingdomCalendar <: WesternCalendar
+
+type UKSettlementCalendar <: UnitedKingdomCalendar end
+type UKLSECalendar <: UnitedKingdomCalendar end
+type UKLMECalendar <: UnitedKingdomCalendar end
 
 abstract BusinessDayConvention
 type Unadjusted <: BusinessDayConvention end
@@ -111,6 +123,8 @@ function adjustweekendholidayUS(dt::Date)
 	return dt
 end
 
+is_holiday(joint::JointCalendar, dt::Date) = is_holiday(joint.cal1, dt) || is_holiday(joint.cal2, dt)
+
 function is_holiday(::USSettlementCalendar , dt::Date)
 
 	const yy = year(dt)
@@ -202,6 +216,134 @@ function is_holiday(::USGovernmentBondCalendar, dt::Date)
 	end
 
 	return false
+end
+
+function is_holiday(::USNYSECalendar, dt::Date)
+  const yy = year(dt)
+	const mm = month(dt)
+	const dd = day(dt)
+	if (
+			# New Year's Day
+			adjustweekendholidayUS(Date(yy, 1, 1)) == dt
+			||
+			# New Year's Day on the previous year when 1st Jan is Saturday
+			(mm == 12 &&  dd == 31 && dayofweek(dt) == Friday)
+			||
+      # Birthday of Martin Luther King, Jr.
+			(dayofweek(dt) == 1 && dayofweekofmonth(dt) ==3 && mm == 1)
+			||
+			# Washington's Birthday
+			(dayofweek(dt) == 1 && dayofweekofmonth(dt) ==3 && mm == 2)
+			||
+      # Good Friday
+      easter_date(yy) - Day(2) == dt
+      ||
+			# Memorial Day is the last Monday in May
+			(dayofweek(dt) == 1 && dayofweekofmonth(dt) == daysofweekinmonth(dt) && mm == 5)
+			||
+			# Independence Day
+			adjustweekendholidayUS(Date(yy, 7, 4)) == dt
+			||
+			# Labor Day is the first Monday in September
+			(dayofweek(dt) == 1 && dayofweekofmonth(dt) == 1 && mm == 9)
+			||
+			# Thanksgiving Day is the fourth Thursday in November
+			(dayofweek(dt) == 4 && dayofweekofmonth(dt) == 4 && mm == 11)
+			||
+			# Christmas
+			adjustweekendholidayUS(Date(yy, 12, 25)) == dt
+		)
+		return true
+	end
+
+  # Special Closings
+  if (
+    # Hurricane Sandy
+    (yy == 2012 && mm == 10 && dd in (29, 30))
+    ||
+    # President Ford's funeral
+    (yy == 2007 && mm == 1 && dd == 2)
+    ||
+    # President Reagan's funeral
+    (yy == 2004 && mm == 6 && dd == 11)
+    ||
+    # 9/11
+    (yy == 2001 && mm == 9 && dd in (11, 12, 13, 14))
+    )
+    return true
+  end
+
+	return false
+end
+
+function adjustweekendholidayUK(dt::Date)
+
+  if dayofweek(dt) == 6
+		return dt + Day(2)
+	end
+
+  if dayofweek(dt) == 7
+		return dt + Day(1)
+	end
+
+	return dt
+end
+
+## UK Calendar functions
+function is_holiday(c::Union{UKSettlementCalendar, UKLSECalendar}, dt::Date)
+  const yy = year(dt)
+	const mm = month(dt)
+	const dd = day(dt)
+
+	if (
+    # New Year's Day
+    adjustweekendholidayUK(Date(yy, 1, 1)) == dt
+    ||
+    # Good Friday
+    easter_date(yy) - Day(2) == dt
+    ||
+    # Easter MONDAY
+    easter_date(yy) + Day(1) == dt
+    ||
+    # first MONDAY of May (Early May Bank Holiday)
+    (dayofweek(dt) == 1 && dayofweekofmonth(dt) == 1 && mm == 5)
+    ||
+    # last MONDAY of MAY (Spring Bank Holiday)
+    (dayofweek(dt) == 1 && dayofweekofmonth(dt) == daysofweekinmonth(dt) && mm == 5)
+    ||
+    # last MONDAY of August (Summer Bank Holiday)
+    (dayofweek(dt) == 1 && dayofweekofmonth(dt) == daysofweekinmonth(dt) && mm == 8)
+    ||
+    # Christmas (possibly moved to MONDAY or Tuesday)
+    adjustweekendholidayUK(Date(yy, 12, 25)) == dt
+    ||
+    # Boxing Day (possibly moved to MONDAY or TUESDAY)
+    adjustweekendholidayUK(adjustweekendholidayUK(Date(yy, 12, 25)) + Day(1)) == dt
+    )
+    return true
+  end
+
+  # Fixed holidays
+  if (
+    # Substitute date for Spring Bank Holiday
+		(dt == Date(2012, 06, 04))
+		||
+		# Diamond Jubilee of Queen Elizabeth II.
+		(dt == Date(2012, 06, 05))
+		||
+		# Golden Jubilee of Queen Elizabeth II.
+		(dt == Date(2002, 06, 03))
+		||
+		# Substitute date for Spring Bank Holiday
+		(dt == Date(2002, 06, 04))
+		||
+		# Wedding of Prince William and Catherine Middleton
+		(dt == Date(2011, 04, 29))
+    )
+    return true
+  end
+
+  return false
 end
 
 function is_holiday(::TargetCalendar, dt::Date)

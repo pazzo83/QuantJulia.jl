@@ -11,7 +11,7 @@ abstract TermStructure
 abstract YieldTermStructure <: TermStructure
 abstract Curve <: YieldTermStructure
 abstract InterpolatedCurve{I, DC, P, T} <: Curve
-abstract VolatilityTermStructure
+abstract VolatilityTermStructure <: TermStructure
 abstract OptionletVolatilityStructure <: VolatilityTermStructure
 abstract BootstrapTrait
 abstract Bootstrap

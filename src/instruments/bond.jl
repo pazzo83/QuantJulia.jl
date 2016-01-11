@@ -34,19 +34,20 @@ function FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention,
   # add redemption
   # coups[end] = SimpleCashFlow(redemption, maturityDate)
 
-  coups = FixedRateLeg{FixedRateCoupon, SimpleCashFlow}(schedule, faceAmount, coup_rate, calendar, paymentConvention, dc)
+  coups = FixedRateLeg(schedule, faceAmount, coup_rate, calendar, paymentConvention, dc)
 
   return FixedRateBond(price, settlementDays, faceAmount, schedule, coups, dc, paymentConvention, redemption, calendar, issueDate, schedule.dates[1], maturityDate, false, pricing_engine, 0.0)
 end
 
-type FloatingRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, P <: PricingEngine} <: Bond
+type FloatingRateBond{I <: Integer, X <: InterestRateIndex, DC <: DayCount, B <: BusinessDayConvention, C <: BusinessCalendar, P <: PricingEngine} <: Bond
   settlementDays::I
   faceAmount::Float64
   schedule::Schedule
   cashflows::IborLeg
-  iborIndex::IborIndex
+  iborIndex::X
   dc::DC
   convention::B
+  calendar::C
   fixingDays::I
   gearings::Vector{Float64}
   spreads::Vector{Float64}
@@ -61,19 +62,19 @@ type FloatingRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, 
   settlementValue::Float64
 end
 
-function FloatingRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, P <: PricingEngine}(settlementDays::I, faceAmount::Float64, schedule::Schedule, iborIndex::IborIndex, dc::DC,
-                          convention::B, fixingDays::I, gearings::Vector{Float64}, spreads::Vector{Float64},
-                          caps::Vector{Float64}, floors::Vector{Float64}, inArrears::Bool, redemption::Float64, issueDate::Date,
-                          pricingEngine::P)
+function FloatingRateBond{I <: Integer, X <: InterestRateIndex, DC <: DayCount, B <: BusinessDayConvention, P <: PricingEngine}(settlementDays::I, faceAmount::Float64, schedule::Schedule, iborIndex::X, dc::DC,
+                          convention::B, fixingDays::I, issueDate::Date, pricingEngine::P, inArrears::Bool = false, redemption::Float64 = 100.0,
+                          gearings::Vector{Float64} = ones(length(schedule.dates) - 1), spreads::Vector{Float64} = zeros(length(schedule.dates) - 1),
+                          caps::Vector{Float64} = Vector{Float64}(), floors::Vector{Float64} = Vector{Float64}())
   maturityDate = schedule.dates[end]
   fixingDaysVect = fill(fixingDays, length(schedule.dates) - 1)
 
-  coups = IborLeg(schedule, faceAmount, iborIndex, dc, convention, fixingDaysVect, gearings, spreads, caps, floors, inArrears)
-  return FloatingRateBond(settlementDays, faceAmount, schedule, coups, iborIndex, dc, convention, fixingDays, gearings, spreads, caps, floors,
+  coups = IborLeg(schedule, faceAmount, iborIndex, dc, convention, fixingDaysVect, gearings, spreads, caps, floors, inArrears; add_redemption=true)
+  return FloatingRateBond(settlementDays, faceAmount, schedule, coups, iborIndex, dc, convention, schedule.cal, fixingDays, gearings, spreads, caps, floors,
                           inArrears, redemption, issueDate, maturityDate, false, pricingEngine, 0.0)
 end
 
-type ZeroCouponBond{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention} <: Bond
+type ZeroCouponBond{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, P <: PricingEngine} <: Bond
   settlementDays::I
   calendar::B
   faceAmount::Float64
@@ -84,13 +85,14 @@ type ZeroCouponBond{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvent
   issueDate::Date
   settlementValue::Float64
   calculated::Bool
+  pricingEngine::P
 end
 
-function ZeroCouponBond{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention}(settlementDays::I, calendar::B, faceAmount::Float64, maturityDate::Date, paymentConvention::C=Following(),
-                        redemption::Float64=100.0, issueDate::Date=Date())
+function ZeroCouponBond{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, P <: PricingEngine}(settlementDays::I, calendar::B, faceAmount::Float64, maturityDate::Date, paymentConvention::C=Following(),
+                        redemption::Float64=100.0, issueDate::Date=Date(), pe::P = DiscountingBondEngine())
   # build redemption CashFlow
   redemption_cf = ZeroCouponLeg(SimpleCashFlow(redemption, maturityDate))
-  return ZeroCouponBond(settlementDays, calendar, faceAmount, maturityDate, paymentConvention, redemption, redemption_cf, issueDate, 0.0, false)
+  return ZeroCouponBond(settlementDays, calendar, faceAmount, maturityDate, paymentConvention, redemption, redemption_cf, issueDate, 0.0, false, pe)
 end
 
 value(b::FixedRateBond) = b.price.value

@@ -2,18 +2,18 @@ using QuantJulia.Time
 
 type NullOptionVolatilityStructure <: OptionletVolatilityStructure end
 
-type ConstantOptionVolatility <: OptionletVolatilityStructure
-  settlementDays::Integer
+type ConstantOptionVolatility{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount} <: OptionletVolatilityStructure
+  settlementDays::I
   referenceDate::Date
-  calendar::BusinessCalendar
-  bdc::BusinessDayConvention
+  calendar::B
+  bdc::C
   volatility::Float64
-  dc::DayCount
+  dc::DC
 end
 
-function ConstantOptionVolatility(settlementDays::Integer, calendar::BusinessCalendar, bdc::BusinessDayConvention, volatility::Float64, dc::DayCount)
+function ConstantOptionVolatility{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount}(settlementDays::I, calendar::B, bdc::C, volatility::Float64, dc::DC)
   today = settings.evaluation_date
-  ref_date = advance(Dates.Day(settlementDays), calendar, today)
+  ref_date = advance(Dates.Day(settlementDays), calendar, today, bdc)
   ConstantOptionVolatility(settlementDays, ref_date, calendar, bdc, volatility, dc)
 end
 
@@ -31,4 +31,4 @@ end
 volatility_impl(ovs::OptionletVolatilityStructure, option_date::Date, strike::Float64) =
               volatility_impl(ovs, time_from_reference(ovs, option_date), strike)
 
-volatility_impl(const_opt_vol::ConstantOptionVolatility, ::Float64, ::Float64) = const_opt_val.volatility
+volatility_impl(const_opt_vol::ConstantOptionVolatility, ::Float64, ::Float64) = const_opt_vol.volatility

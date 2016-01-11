@@ -44,7 +44,7 @@ function initialize!(interp::LogInterpolation, x_vals::Vector{Float64}, y_vals::
 
   log_y = zeros(length(y_vals))
   for i = 1:length(y_vals)
-    @inbounds log_y[i] = log(i)
+    @inbounds log_y[i] = log(y_vals[i])
   end
 
   initialize!(interp.interpolator, x_vals, log_y)
@@ -67,7 +67,6 @@ function update!{I <: Integer}(interp::LogInterpolation, idx::I)
   for i = 1:idx
     @inbounds interp.interpolator.y_vals[i] = log(interp.y_vals[i])
   end
-
   # use these log values to update the linear interpolator
   update!(interp.interpolator, idx)
 
@@ -109,5 +108,10 @@ value(interp::LogInterpolation, val::Float64) = exp(value(interp.interpolator, v
 
 function value(interp::LinearInterpolation, val::Float64)
   i = locate(interp, val)
+  # println("I is ", i)
+  # println("Val is ", val)
+  # println("Y vals ", interp.y_vals)
+  # println("X vals ", interp.x_vals)
+  # println("S vals ", interp.s)
   return interp.y_vals[i] + (val - interp.x_vals[i]) * interp.s[i]
 end

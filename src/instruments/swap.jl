@@ -69,9 +69,9 @@ function VanillaSwap{PrT <: Dates.Period, C <: BusinessCalendar, F <: Frequency,
   # build swap cashflows
   legs = Vector{Leg}(2)
   # first leg is fixed
-  legs[1] = FixedRateLeg(fixed_schedule, nominal, fixed_rate, fixedCal, floatConvention, fixedDayCount, false)
+  legs[1] = FixedRateLeg(fixed_schedule, nominal, fixed_rate, fixedCal, floatConvention, fixedDayCount; add_redemption=false)
   # second leg is floating
-  legs[2] = IborLeg(float_schedule, nominal, iborIndex, floatDayCount, floatConvention)
+  legs[2] = IborLeg(float_schedule, nominal, iborIndex, floatDayCount, floatConvention; add_redemption=false)
 
   payer = _build_payer(swapT)
 

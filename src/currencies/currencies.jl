@@ -1,12 +1,12 @@
 ### Based off of Ito.jl
 type NullCurrency <: AbstractCurrency end
 
-immutable Currency{S <: AbstractString, I <: Integer} <: AbstractCurrency
+immutable Currency{S <: AbstractString, S2 <: AbstractString, S3 <: AbstractString, I <: Integer} <: AbstractCurrency
 	name::S
 	code::S
 	numeric::I
-	symbol::S
-	fractionSymbol::S
+	symbol::S2
+	fractionSymbol::S3
 	fractionsPerUnit::I
 	rounding::Function
 	formatString::S

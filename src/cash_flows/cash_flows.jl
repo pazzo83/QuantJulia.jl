@@ -44,9 +44,10 @@ type FixedRateCoupon{DC <: DayCount} <: Coupon
   refPeriodStart::Date
   refPeriodEnd::Date
   dc::DC
+  accrualPeriod::Float64
 end
 
-type IborCoupon{I <: Integer, DC <: DayCount, ICP <: IborCouponPricer} <: Coupon
+type IborCoupon{I <: Integer, X <: InterestRateIndex, DC <: DayCount, ICP <: IborCouponPricer} <: Coupon
   paymentDate::Date
   nominal::Float64
   accrualStartDate::Date
@@ -55,7 +56,7 @@ type IborCoupon{I <: Integer, DC <: DayCount, ICP <: IborCouponPricer} <: Coupon
   fixingValueDate::Date
   fixingEndDate::Date
   fixingDays::I
-  iborIndex::IborIndex
+  iborIndex::X
   gearing::Float64
   spread::Float64
   refPeriodStart::Date
@@ -64,13 +65,14 @@ type IborCoupon{I <: Integer, DC <: DayCount, ICP <: IborCouponPricer} <: Coupon
   isInArrears::Bool
   spanningTime::Float64
   pricer::ICP
+  accrualPeriod::Float64
 end
 
-function IborCoupon{I <: Integer, DC <: DayCount, ICP <: IborCouponPricer}(paymentDate::Date, nominal::Float64, startDate::Date, endDate::Date, fixingDays::I, iborIndex::IborIndex,
+function IborCoupon{I <: Integer, X <: InterestRateIndex, DC <: DayCount, ICP <: IborCouponPricer}(paymentDate::Date, nominal::Float64, startDate::Date, endDate::Date, fixingDays::I, iborIndex::X,
                     gearing::Float64, spread::Float64, refPeriodStart::Date, refPeriodEnd::Date, dc::DC, isInArrears::Bool,
                     pricer::ICP)
   # TODO check if right fixing days
-  _fixing_date = fixing_date(iborIndex, startDate)
+  _fixing_date = isInArrears ? fixing_date(iborIndex, endDate) : fixing_date(iborIndex, startDate)
   fixing_cal = iborIndex.fixingCalendar
   idx_fixing_days = iborIndex.fixingDays
   fixing_val_date = advance(Base.Dates.Day(idx_fixing_days), fixing_cal, _fixing_date, iborIndex.convention)
@@ -87,7 +89,7 @@ function IborCoupon{I <: Integer, DC <: DayCount, ICP <: IborCouponPricer}(payme
   ## TODO ensure positive (> 0) spanning_time
 
   return IborCoupon(paymentDate, nominal, startDate, endDate, _fixing_date, fixing_val_date, fixing_end_date, fixingDays, iborIndex, gearing, spread,
-                    refPeriodStart, refPeriodEnd, dc, isInArrears, spanning_time, pricer)
+                    refPeriodStart, refPeriodEnd, dc, isInArrears, spanning_time, pricer, -1.0)
 end
 
 ## COUPON METHODS ##
@@ -100,6 +102,10 @@ date_accrual_end{C <: Coupon}(coup::C) = coup.accrualEndDate
 
 function calc_rate(coup::IborCoupon)
   initialize!(coup.pricer, coup)
+  # if coup.isInArrears
+  #   println("sr ", sr)
+  #   error("BREAK")
+  # end
   return swaplet_rate(coup.pricer, coup)
 end
 
@@ -116,30 +122,32 @@ end
 # legs to build cash flows
 abstract Leg <: CashFlows
 
-type FixedRateLeg{F <: FixedRateCoupon, S <: SimpleCashFlow} <: Leg
-  coupons::Vector{Union{F, S}}
+type FixedRateLeg <: Leg
+  coupons::Vector{Union{FixedRateCoupon, SimpleCashFlow}}
   # redemption::SimpleCashFlow
 
-  function FixedRateLeg{B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount}(schedule::Schedule, faceAmount::Float64, rate::Float64, calendar::B, paymentConvention::C, dc::DC, add_redemption::Bool = true)
+  function FixedRateLeg{B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount}(schedule::Schedule, faceAmount::Float64, rate::Float64, calendar::B, paymentConvention::C, dc::DC; add_redemption::Bool = true)
     n = add_redemption ? length(schedule.dates) : length(schedule.dates) - 1
-    coups = Vector{CashFlow}(n)
+    coups = Vector{Union{FixedRateCoupon, SimpleCashFlow}}(n)
 
     start_date = schedule.dates[1]
     end_date = schedule.dates[2]
+    payment_date = adjust(calendar, paymentConvention, end_date)
     #TODO: setup payment adjustments and the like
-    coups[1] = FixedRateCoupon(end_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc)
+    coups[1] = FixedRateCoupon(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
 
     # build coupons
     count = 2
     start_date = end_date
     end_date = count == length(schedule.dates) ? schedule.dates[end] : schedule.dates[count + 1]
-
+    payment_date = adjust(calendar, paymentConvention, end_date)
     while start_date < schedule.dates[end]
-      @inbounds coups[count] = FixedRateCoupon(end_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc)
+      @inbounds coups[count] = FixedRateCoupon(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
 
       count += 1
       start_date = end_date
       end_date = count == length(schedule.dates) ? schedule.dates[end] : schedule.dates[count + 1]
+      payment_date = adjust(calendar, paymentConvention, end_date)
     end
 
     if add_redemption
@@ -155,27 +163,53 @@ type ZeroCouponLeg <: Leg
 end
 
 type IborLeg <: Leg
-  coupons::Vector{IborCoupon}
+  coupons::Vector{Union{IborCoupon, SimpleCashFlow}}
 
-  function IborLeg{DC <: DayCount, C <: BusinessDayConvention, I <: Integer, ICP <: IborCouponPricer}(schedule::Schedule, nominal::Float64, iborIndex::IborIndex, paymentDC::DC, paymentAdj::C,
-                   fixingDays::Vector{I} = fill(iborIndex.fixingDays, length(schedule.dates) - 1), gearings::Vector{Float64} = ones(length(schedule.dates) - 1),
-                   spreads::Vector{Float64} = zeros(length(schedule.dates) - 1), caps::Vector{Float64} = Vector{Float64}(),
-                   floors::Vector{Float64} = Vector{Float64}(), isInArrears::Bool = false, isZero::Bool = false,
-                   pricer::ICP = BlackIborCouponPricer())
-    n = length(schedule.dates) - 1
-    coups = Vector{IborCoupon}(n)
+  function IborLeg{X <: InterestRateIndex, DC <: DayCount, C <: BusinessDayConvention, I <: Integer, ICP <: IborCouponPricer}(schedule::Schedule, nominal::Float64, iborIndex::X, paymentDC::DC, paymentAdj::C,
+                   fixingDays::Vector{I} = fill(iborIndex.fixingDays, length(schedule.dates) - 1),
+                   gearings::Vector{Float64} = ones(length(schedule.dates) - 1), spreads::Vector{Float64} = zeros(length(schedule.dates) - 1),
+                   caps::Vector{Float64} = Vector{Float64}(), floors::Vector{Float64} = Vector{Float64}(), isInArrears::Bool = false,
+                   isZero::Bool = false, pricer::ICP = BlackIborCouponPricer(); add_redemption::Bool = true)
+    n = add_redemption ? length(schedule.dates) : length(schedule.dates) - 1
+    coups = Vector{Union{IborCoupon, SimpleCashFlow}}(n)
     last_payment_date = adjust(schedule.cal, paymentAdj, schedule.dates[end])
 
-    ref_date = _start = end_date = _end = Date()
+    _start = ref_start = schedule.dates[1]
+    _end = ref_end = schedule.dates[2]
+    payment_date = adjust(schedule.cal, paymentAdj, _end)
+    #TODO: setup payment adjustments and the like
+    coups[1] = IborCoupon(payment_date, nominal, _start, _end, fixingDays[1], iborIndex, gearings[1], spreads[1], ref_start, ref_end,
+                          paymentDC, isInArrears, pricer)
 
-    for i = 1:n
-      ref_start = _start = schedule.dates[i]
-      ref_end = _end = schedule.dates[i + 1]
-      payment_date = isZero ? last_payment_date : adjust(schedule.cal, paymentAdj, _end)
+    # ref_date = _start = end_date = _end = Date()
+    # build coupons
+    count = 2
+    ref_start = _start = _end
+    ref_end = _end = count == length(schedule.dates) ? schedule.dates[end] : schedule.dates[count + 1]
+    payment_date = adjust(schedule.cal, paymentAdj, _end)
 
-      # Just Floating Rate Coupons right now
-      coups[i] = IborCoupon(payment_date, nominal, _start, _end, fixingDays[i], iborIndex, gearings[i], spreads[i], ref_start, ref_end,
+    while _start < schedule.dates[end]
+      @inbounds coups[count] = IborCoupon(payment_date, nominal, _start, _end, fixingDays[count], iborIndex, gearings[count], spreads[count], ref_start, ref_end,
                             paymentDC, isInArrears, pricer)
+
+      count += 1
+      ref_start = _start = _end
+      ref_end = _end = count == length(schedule.dates) ? schedule.dates[end] : schedule.dates[count + 1]
+      payment_date = adjust(schedule.cal, paymentAdj, _end)
+    end
+
+    # for i = 1:n
+    #   ref_start = _start = schedule.dates[i]
+    #   ref_end = _end = schedule.dates[i + 1]
+    #   payment_date = isZero ? last_payment_date : adjust(schedule.cal, paymentAdj, _end)
+    #
+    #   # Just Floating Rate Coupons right now
+    #   coups[i] = IborCoupon(payment_date, nominal, _start, _end, fixingDays[i], iborIndex, gearings[i], spreads[i], ref_start, ref_end,
+    #                         paymentDC, isInArrears, pricer)
+    # end
+
+    if add_redemption
+      @inbounds coups[end] = SimpleCashFlow(nominal, _end)
     end
 
     new(coups)
@@ -232,12 +266,14 @@ end
 
 function swaplet_price(pricer::BlackIborCouponPricer, coup::IborCoupon)
   _swaplet_price = adjusted_fixing(pricer, coup) * pricer.accrual_period * pricer.discount
+  # if coup.isInArrears
+  #   println("gearing ", coup.gearing)
+  #   error("BREAK")
+  # end
   return coup.gearing * _swaplet_price + pricer.spreadLegValue
 end
 
-function swaplet_rate(pricer::BlackIborCouponPricer, coup::IborCoupon)
-  return swaplet_price(pricer, coup) / (pricer.accrual_period * pricer.discount)
-end
+swaplet_rate(pricer::BlackIborCouponPricer, coup::IborCoupon) = swaplet_price(pricer, coup) / (pricer.accrual_period * pricer.discount)
 
 function adjusted_fixing(pricer::BlackIborCouponPricer, coup::IborCoupon, fixing::Float64 = -1.0)
   if fixing == -1.0
@@ -260,8 +296,27 @@ function adjusted_fixing(pricer::BlackIborCouponPricer, coup::IborCoupon, fixing
   d3 = maturity_date(idx, d2)
   tau = year_fraction(idx.dc, d2, d3)
   varience = black_varience(pricer.capletVolatility, d1, fixing)
+  # println("fixing ", fixing)
+  # println("d1 ", d1)
+  # println("d2 ", d2)
+  # println("d3 ", d3)
+  # println("tau ", tau)
+  # println("varience ", varience)
+
   adj = fixing * fixing * varience * tau / (1.0 + fixing * tau)
+  # println("adj ", adj)
+  # error("BREAK")
   return fixing + adj
+end
+
+function update_pricer!{O <: OptionletVolatilityStructure}(leg::IborLeg, opt::O)
+  for coup in leg.coupons
+    if isa(coup, IborCoupon)
+      coup.pricer.capletVolatility = opt
+    end
+  end
+
+  return leg
 end
 
 ## Pricer Methods ##
@@ -323,7 +378,7 @@ end
 # end
 
 ## NPV METHODS ##
-function npv{Y <: YieldTermStructure}(leg::FixedRateLeg, yts::Y, settlement_date::Date, npv_date::Date)
+function npv{L <: Leg, Y <: YieldTermStructure}(leg::L, yts::Y, settlement_date::Date, npv_date::Date)
   # stuff
   totalNPV = 0.0
   if length(leg.coupons) == 0
@@ -334,7 +389,6 @@ function npv{Y <: YieldTermStructure}(leg::FixedRateLeg, yts::Y, settlement_date
     if has_occurred(i, settlement_date)
       continue
     end
-
     @inbounds totalNPV += amount(i) * discount(yts, date(i))
   end
 
@@ -414,6 +468,15 @@ function npvbps{L <: Leg, Y <: YieldTermStructure}(leg::L, yts::Y, settlement_da
     if isa(cp, Coupon)
       bps += cp.nominal * accrual_period(cp) * df
     end
+    # if isa(cp, FixedRateCoupon)
+    #   println("###########################")
+    #   println("df ", df)
+    #   println("bps ", bps)
+    #   println("Date ", date(cp))
+    #   println("nom ", cp.nominal)
+    #   println("acru p ", accrual_period(cp))
+    #   println("DayCount ", cp.dc)
+    # end
   end
   d = discount(yts, npv_date)
   npv /= d
@@ -516,7 +579,7 @@ function next_cashflow{L <: Leg}(cf::L, settlement_date::Date)
   return findnext(next_cf, cf.coupons, 1, settlement_date)
 end
 
-function accrued_amount(cf::FixedRateLeg, settlement_date::Date, include_settlement_cf::Bool = false)
+function accrued_amount{L <: Leg}(cf::L, settlement_date::Date, include_settlement_cf::Bool = false)
   next_cf_idx = next_cashflow(cf, settlement_date)
   if cf.coupons[next_cf_idx] == length(cf.coupons)
     return 0.0
@@ -547,7 +610,23 @@ function accrued_amount(coup::FixedRateCoupon, settlement_date::Date)
       (compound_factor(coup.rate, coup.accrualStartDate, min(settlement_date, coup.accrualEndDate), coup.refPeriodStart, coup.refPeriodEnd) - 1.0)
 end
 
-accrual_period{C <: Coupon}(coup::C) = year_fraction(coup.dc, coup.accrualStartDate, coup.accrualEndDate, coup.refPeriodStart, coup.refPeriodEnd)
+function accrued_amount(coup::IborCoupon, settlement_date::Date)
+  if settlement_date <= coup.accrualStartDate || settlement_date > coup.paymentDate
+    return 0.0
+  end
+
+  return coup.nominal * calc_rate(coup) * year_fraction(coup.dc, coup.accrualStartDate, min(settlement_date, coup.accrualEndDate), coup.refPeriodStart, coup.refPeriodEnd)
+end
+
+accrual_period!{C <: Coupon}(coup::C, p::Float64) = coup.accrualPeriod = p
+function accrual_period{C <: Coupon}(coup::C)
+  if coup.accrualPeriod == -1.0
+    p = year_fraction(coup.dc, coup.accrualStartDate, coup.accrualEndDate, coup.refPeriodStart, coup.refPeriodEnd)
+    accrual_period!(coup, p)
+  end
+
+  return coup.accrualPeriod
+end
 
 function has_occurred{C <: CashFlow}(cf::C, ref_date::Date, include_settlement_cf::Bool = true)
   # will need to expand this
