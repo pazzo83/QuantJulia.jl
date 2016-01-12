@@ -81,22 +81,26 @@ function forward_rate{T <: YieldTermStructure, C <: CompoundingType, F <: Freque
 end
 
 ## FlatForwardTermStructure
-type FlatForwardTermStructure <: YieldTermStructure
-  settlement_days::Integer
+type FlatForwardTermStructure{I <: Integer, B <: BusinessCalendar, DC <: DayCount, C <: CompoundingType, F <: Frequency} <: YieldTermStructure
+  settlement_days::I
   referenceDate::Date
-  calendar::BusinessCalendar
+  calendar::B
   forward::Quote
-  dc::DayCount
-  comp::CompoundingType
-  freq::Frequency
+  dc::DC
+  comp::C
+  freq::F
   rate::InterestRate
-
-  function FlatForwardTermStructure(settlement_days::Integer, referenceDate::Date, calendar::BusinessCalendar, forward::Quote, dc::DayCount, comp::CompoundingType, freq::Frequency)
-    rate = InterestRate(forward.value, dc, comp, freq)
-    new(settlement_days, referenceDate, calendar, forward, dc, comp, freq, rate)
-  end
 end
 
-discount(ffts::FlatForwardTermStructure, time_frac::Float64) = discount_factor(ffts.rate, time_frac)
+function FlatForwardTermStructure{I <: Integer, B <: BusinessCalendar, DC <: DayCount, C <: CompoundingType, F <: Frequency}(settlement_days::I, referenceDate::Date, calendar::B, forward::Quote, dc::DC,
+                                  comp::C = ContinuousCompounding(), freq::F = QuantJulia.Time.Annual())
+  rate = InterestRate(forward.value, dc, comp, freq)
+  FlatForwardTermStructure(settlement_days, referenceDate, calendar, forward, dc, comp, freq, rate)
+end
+
+FlatForwardTermStructure{B <: BusinessCalendar, DC <: DayCount, C <: CompoundingType, F <: Frequency}(referenceDate::Date, calendar::B, forward::Quote, dc::DC, comp::C = ContinuousCompounding(), freq::F = QuantJulia.Time.Annual()) =
+                        FlatForwardTermStructure(0, referenceDate, calendar, forward, dc, comp, freq)
+
+discount_impl(ffts::FlatForwardTermStructure, time_frac::Float64) = discount_factor(ffts.rate, time_frac)
 
 # discount_impl(ffts::FlatForwardTermStructure, time_frac::Float64) = discount_factor(ffts.rate, time_frac)
