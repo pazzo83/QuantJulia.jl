@@ -1,4 +1,4 @@
-using QuantJulia.Time
+using QuantJulia.Time, QuantJulia.Math
 
 const BASIS_POINT = 0.0001
 
@@ -69,7 +69,7 @@ end
 amount(coup::IborCoupon) = calc_rate(coup) * accrual_period(coup) * coup.nominal
 
 function calc_rate(coup::IborCoupon)
-  initialize!(coup.pricer, coup)
+  QuantJulia.initialize!(coup.pricer, coup)
   # if coup.isInArrears
   #   println("sr ", sr)
   #   error("BREAK")

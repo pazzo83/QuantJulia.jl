@@ -4,9 +4,9 @@ using QuantJulia.Math, QuantJulia.Time
 
 type NullCurve <: Curve end
 
-type PiecewiseYieldCurve{I <: Instrument, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait} <: InterpolatedCurve{I, DC, P, T}
+type PiecewiseYieldCurve{B <: BootstrapHelper, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait} <: InterpolatedCurve{B, DC, P, T}
   referenceDate::Date
-  instruments::Vector{I}
+  instruments::Vector{B}
   dc::DC
   interp::P
   trait::T
@@ -19,7 +19,7 @@ type PiecewiseYieldCurve{I <: Instrument, DC <: DayCount, P <: Interpolation, T 
   calculated::Bool
 end
 
-function PiecewiseYieldCurve{I <: Instrument, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait}(referenceDate::Date, instruments::Vector{I}, dc::DC, interp::P, trait::T,
+function PiecewiseYieldCurve{B <: BootstrapHelper, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait}(referenceDate::Date, instruments::Vector{B}, dc::DC, interp::P, trait::T,
                                 accuracy::Float64, boot::Bootstrap)
   # get the initial length of instruments
   n = length(instruments)
@@ -43,7 +43,7 @@ function PiecewiseYieldCurve{I <: Instrument, DC <: DayCount, P <: Interpolation
   return pyc
 end
 
-type FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: Bond, DC <: DayCount, F <: FittingMethod} <: Curve
+type FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: BondHelper, DC <: DayCount, F <: FittingMethod} <: Curve
   settlementDays::I
   referenceDate::Date
   calendar::C
@@ -81,7 +81,7 @@ type FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: Bond, DC 
   # end
 end
 
-FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: Bond, DC <: DayCount, F <: FittingMethod}(settlementDays::I, referenceDate::Date, calendar::C, bonds::Vector{B}, dc::DC, fittingMethod::F, accuracy::Float64=1e-10,
+FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: BondHelper, DC <: DayCount, F <: FittingMethod}(settlementDays::I, referenceDate::Date, calendar::C, bonds::Vector{B}, dc::DC, fittingMethod::F, accuracy::Float64=1e-10,
                                      maxEvaluations::I=10000, simplexLambda::Float64=1.0) =
                                      FittedBondDiscountCurve{I, C, B, DC, F}(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda)
 
@@ -142,7 +142,7 @@ function initialize!(curve::FittedBondDiscountCurve)
 
   squared_sum = 0.0
   for i = 1:n
-    bond = curve.bonds[i]
+    bond = curve.bonds[i].bond
     leg = bond.cashflows
     clean_price = bond.faceAmount
     bond_settlement = get_settlement_date(bond)
@@ -212,7 +212,8 @@ function value{C <: CostFunction, T}(cf::C, x::Vector{T})
   squared_error = 0.0
   n = length(cf.curve.bonds)
 
-  for (i, bond) in enumerate(cf.curve.bonds)
+  for (i, bh) in enumerate(cf.curve.bonds)
+    bond = bh.bond
     bond_settlement = get_settlement_date(bond)
     model_price = -accrued_amount(bond, bond_settlement)
     leg = bond.cashflows

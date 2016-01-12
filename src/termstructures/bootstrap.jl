@@ -47,11 +47,11 @@ end
 
 get_pricing_engine{Y}(::Discount, yts::Y) = DiscountingBondEngine(yts)
 
-apply_termstructure!{R <: AbstractRate, T <: TermStructure}(rate::R, ts::T) = rate.iborIndex.ts = ts
-apply_termstructure!{B <: Bond, T <: TermStructure}(b::B, ts::T) = b.pricingEngine.yts = ts
-function apply_termstructure!{S <: Swap, T <: TermStructure}(s::S, ts::T)
-  s.iborIndex.ts = ts
-  s.pricingEngine.yts = ts
+apply_termstructure!{R <: RateHelper, T <: TermStructure}(rate::R, ts::T) = rate.iborIndex.ts = ts
+apply_termstructure!{B <: BondHelper, T <: TermStructure}(b::B, ts::T) = b.bond.pricingEngine.yts = ts
+function apply_termstructure!{T <: TermStructure}(s::SwapRateHelper, ts::T)
+  s.swap.iborIndex.ts = ts
+  s.swap.pricingEngine.yts = ts
 
   return s
 end
@@ -145,7 +145,7 @@ function calculate!{T <: TermStructure, S <: Solver1D, SS <: Solver1D}(::Bootstr
   return ts
 end
 
-function bootstrap_error{I <: Integer, T <: Instrument, Y <: YieldTermStructure}(i::I, inst::T, ts::Y)
+function bootstrap_error{I <: Integer, T <: BootstrapHelper, Y <: YieldTermStructure}(i::I, inst::T, ts::Y)
   function bootstrap_error_inner(g::Float64)
     # update trait
     update_guess!(ts.trait, i, ts, g)
@@ -161,6 +161,5 @@ function bootstrap_error{I <: Integer, T <: Instrument, Y <: YieldTermStructure}
   return bootstrap_error_inner
 end
 
-quote_error{B <: Bond}(inst::B) = QuantJulia.value(inst) - implied_quote(inst, true) # recalculate
-quote_error{R <: AbstractRate}(rate::R) = rate.rate.value - implied_quote(rate, rate.iborIndex.ts)
-quote_error{S <: Swap}(swap::S) = swap.rate.value - implied_quote(swap)
+quote_error{B <: BondHelper}(inst::B) = QuantJulia.value(inst) - implied_quote(inst, true) # recalculate
+quote_error{R <: RateHelper}(rate::R) = QuantJulia.value(rate) - implied_quote(rate)

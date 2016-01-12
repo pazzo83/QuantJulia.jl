@@ -4,7 +4,7 @@ using QuantJulia
 
 function build_bonds(bond_mats::Vector{Date}, bond_rates::Vector{Float64}, tenor::QuantJulia.Time.TenorPeriod, conv::QuantJulia.Time.BusinessDayConvention,
                     rule::QuantJulia.Time.DateGenerationRule, calendar::QuantJulia.Time.BusinessCalendar, dc::QuantJulia.Time.DayCount, freq::QuantJulia.Time.Frequency, issue_date::Date)
-  bonds = Vector{FixedRateBond}(length(bond_mats))
+  bonds = Vector{FixedRateBondHelper}(length(bond_mats))
   pricing_engine = DiscountingBondEngine()
 
   for i =1:length(bond_mats)
@@ -12,8 +12,8 @@ function build_bonds(bond_mats::Vector{Date}, bond_rates::Vector{Float64}, tenor
     # rate = bond_rates[i] / 100
     rate = bond_rates[i]
     sched = QuantJulia.Time.Schedule(issue_date, term_date, tenor, conv, conv, rule, true)
-    bond = FixedRateBond(Quote(100.0), 0, 100.0, sched, rate, dc, conv, 100.0, issue_date, calendar, pricing_engine)
-    bonds[i] = bond
+    bond_help = FixedRateBondHelper(Quote(100.0), FixedRateBond(0, 100.0, sched, rate, dc, conv, 100.0, issue_date, calendar, pricing_engine))
+    bonds[i] = bond_help
   end
 
   return bonds
@@ -21,11 +21,11 @@ end
 
 function build_depos{P <: Dates.Period, DC <: QuantJulia.Time.DayCount, B <: QuantJulia.Time.BusinessDayConvention, C <: QuantJulia.Time.BusinessCalendar, I <: Integer}(depo_quotes::Vector{Float64}, depo_tenors::Vector{P},
                     dc::DC, conv::B, calendar::C, fixing_days::I)
-  depos = Vector{DepositRate}(length(depo_quotes))
+  depos = Vector{DepositRateHelper}(length(depo_quotes))
   for i = 1:length(depo_quotes)
     depo_quote = Quote(depo_quotes[i])
     depo_tenor = QuantJulia.Time.TenorPeriod(depo_tenors[i])
-    depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv, true, dc)
+    depo = DepositRateHelper(depo_quote, depo_tenor, fixing_days, calendar, conv, true, dc)
     depos[i] = depo
   end
 
@@ -35,11 +35,11 @@ end
 function build_swaps{P <: Dates.Period, DC <: QuantJulia.Time.DayCount, B <: QuantJulia.Time.BusinessDayConvention, C <: QuantJulia.Time.BusinessCalendar, F <: QuantJulia.Time.Frequency, I <: Integer}(swap_quotes::Vector{Float64},
                     swap_tenors::Vector{P}, fixed_dc::DC, fixed_conv::B, calendar::C, fixed_freq::F, float_index::IborIndex, forward_start::I)
   forward_start_period = Dates.Day(forward_start)
-  swaps = Vector{VanillaSwap}(length(swap_quotes))
+  swaps = Vector{SwapRateHelper}(length(swap_quotes))
   pricing_engine = DiscountingSwapEngine()
 
   for i = 1:length(swap_quotes)
-    swaps[i] = VanillaSwap(swap_quotes[i], swap_tenors[i], calendar, fixed_freq, fixed_conv, fixed_dc, float_index, 0.0, forward_start_period, pricing_engine)
+    swaps[i] = SwapRateHelper(swap_quotes[i], swap_tenors[i], calendar, fixed_freq, fixed_conv, fixed_dc, float_index, 0.0, forward_start_period, pricing_engine)
   end
 
   return swaps
@@ -263,7 +263,7 @@ function generate_fixedrate_bond()
 
   pe = DiscountingBondEngine()
 
-  fixedrate_bond = FixedRateBond(Quote(face_amount), settlement_days, face_amount, fx_schedule, 0.045, QuantJulia.Time.ISMAActualActual(), QuantJulia.Time.ModifiedFollowing(),
+  fixedrate_bond = FixedRateBond(settlement_days, face_amount, fx_schedule, 0.045, QuantJulia.Time.ISMAActualActual(), QuantJulia.Time.ModifiedFollowing(),
                                 100.0, Date(2007, 5, 15), fx_schedule.cal, pe)
 
   return fixedrate_bond
@@ -293,11 +293,11 @@ function generate_discounting_ts(sett::Date)
   coupon_rates = [0.02375, 0.04625, 0.03125, 0.04000, 0.04500]
   market_quotes = [100.390625, 106.21875, 100.59375, 101.6875, 102.140625]
 
-  insts = Vector{Instrument}(length(depo_rates) + length(issue_dates))
+  insts = Vector{BootstrapHelper}(length(depo_rates) + length(issue_dates))
   for i = 1:length(depo_rates)
     depo_quote = Quote(depo_rates[i])
     depo_tenor = QuantJulia.Time.TenorPeriod(depo_tens[i])
-    depo = DepositRate(depo_quote, depo_tenor, fixing_days, calendar, conv_depo, true, dc_depo)
+    depo = DepositRateHelper(depo_quote, depo_tenor, fixing_days, calendar, conv_depo, true, dc_depo)
     insts[i] = depo
   end
 
@@ -310,7 +310,7 @@ function generate_discounting_ts(sett::Date)
     issue_date = issue_dates[i]
     market_quote = market_quotes[i]
     sched = QuantJulia.Time.Schedule(issue_date, term_date, tenor, conv, conv, rule, true)
-    bond = FixedRateBond(Quote(market_quote), 3, 100.0, sched, rate, dc_bond, conv, 100.0, issue_date, calendar, pricing_engine)
+    bond = FixedRateBondHelper(Quote(market_quote), FixedRateBond(3, 100.0, sched, rate, dc_bond, conv, 100.0, issue_date, calendar, pricing_engine))
     insts[i + length(depo_rates)] = bond
   end
 
@@ -393,7 +393,8 @@ function main()
 
   println(" tenor | coupon | bstrap |  (a)  |  (b)  |  (c)  |  (d)  |  (e)  ")
 
-  for bond in bonds
+  for bh in bonds
+    bond = bh.bond
     date_vec = Vector{Date}(length(bond.cashflows.coupons) + 1)
     date_vec[1] = issue_date
     for (i, cf) in enumerate(bond.cashflows.coupons)
@@ -451,7 +452,7 @@ function main3()
 
   swaps = build_swaps(swap_quotes, swap_tenors, fixedLegDC, fixedLegConv, cal, fixedLegFreq, floatingLegIndex, forwardStart)
 
-  insts = Vector{Instrument}(length(swap_quotes) + length(depo_quotes))
+  insts = Vector{BootstrapHelper}(length(swap_quotes) + length(depo_quotes))
 
   insts[1:length(depo_quotes)] = depos
   insts[length(depo_quotes) + 1: end] = swaps

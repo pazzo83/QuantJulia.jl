@@ -16,6 +16,9 @@ abstract OptionletVolatilityStructure <: VolatilityTermStructure
 abstract BootstrapTrait
 abstract Bootstrap
 abstract FittingMethod
+abstract BootstrapHelper
+abstract BondHelper <: BootstrapHelper
+abstract RateHelper <: BootstrapHelper
 
 # Pricing Engines
 abstract PricingEngine{Y}

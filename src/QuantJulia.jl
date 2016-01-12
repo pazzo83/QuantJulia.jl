@@ -31,7 +31,7 @@ include("math/Math.jl")
 
 export
     # abstract_types.jl
-    CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap,
+    CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap, BootstrapHelper, BondHelper, RateHelper,
     FittingMethod, CashFlows, CashFlow, Coupon, CouponPricer, IborCouponPricer, Instrument, Bond, Swap, SwapType, PricingEngine, Duration, AbstractRate, Results,
     InterestRateIndex, AbstractCurrency,
 
@@ -47,6 +47,28 @@ export
 
     # Indexes
     IborIndex, LiborIndex, fixing_date, maturity_date, fixing, forecast_fixing, euribor_index, usd_libor_index,
+
+    # cash_flows/cash_flows.jl
+    SimpleCashFlow, Leg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
+    accrual_days, accrual_days, next_cashflow, has_occurred, next_coupon_rate, initialize!,
+
+    # cash_flows/fixed_rate_coupon.jl
+    FixedRateCoupon, FixedRateLeg,
+
+    # cash_flows/floating_rate_coupon.jl
+    BlackIborCouponPricer, IborCoupon, IborLeg, update_pricer!,
+
+    # instruments/bond.jl
+    FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv, clean_price, dirty_price, accrued_amount, 
+
+    # instruments/swap.jl
+    Payer, Receiver, SwapResults, VanillaSwap,
+
+    # termstructures/bond_helpers.jl
+    FixedRateBondHelper, implied_quote,
+
+    # termstructures/rate_helpers.jl
+    SwapRateHelper, DepositRateHelper, implied_quote,
 
     # termstructures/TermStructures.jl
     check_range, max_date, time_from_reference,
@@ -69,29 +91,6 @@ export
     # termstructures/nonlinear_fitting_methods.jl
     ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, CubicBSplinesFitting, discount_function, guess_size,
 
-    # cash_flows/cash_flows.jl
-    SimpleCashFlow, Leg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
-    accrual_days, accrual_days, next_cashflow, has_occurred, next_coupon_rate, 
-
-    # cash_flows/fixed_rate_coupon.jl
-    FixedRateCoupon, FixedRateLeg,
-
-    # cash_flows/floating_rate_coupon.jl
-    BlackIborCouponPricer, IborCoupon, IborLeg, update_pricer!,
-
-    # instruments/bond.jl
-    FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv,
-    # instruments/rate.jl
-    DepositRate,
-    # instruments/swap.jl
-    Payer, Receiver, SwapResults, VanillaSwap,
-
-    # termstructures/bond_helpers.jl
-    implied_quote, clean_price, dirty_price, settlement_date,
-
-    # termstructures/rate_helpers.jl
-    implied_quote,
-
     # pricing_engines/pricing_engines.jl
     DiscountingBondEngine, DiscountingSwapEngine, calculate
 
@@ -110,6 +109,20 @@ include("InterestRates.jl")
 # Indexes
 include("indexes/indexes.jl")
 
+# Cash Flows ------------------------------------
+include("cash_flows/cash_flows.jl")
+include("cash_flows/fixed_rate_coupon.jl")
+include("cash_flows/floating_rate_coupon.jl")
+
+# Instruments ------------------------
+# bond
+include("instruments/bond.jl")
+include("instruments/swap.jl")
+
+# helpers
+include("termstructures/bond_helpers.jl")
+include("termstructures/rate_helpers.jl")
+
 # Term Structures -----------------------------------
 include("termstructures/TermStructures.jl")
 # yield term structures
@@ -120,21 +133,6 @@ include("termstructures/curve.jl")
 include("termstructures/vol_term_structure.jl")
 # bootstrapping
 include("termstructures/bootstrap.jl")
-
-# Cash Flows ------------------------------------
-include("cash_flows/cash_flows.jl")
-include("cash_flows/fixed_rate_coupon.jl")
-include("cash_flows/floating_rate_coupon.jl")
-
-# Instruments ------------------------
-# bond
-include("instruments/bond.jl")
-include("instruments/rate.jl")
-include("instruments/swap.jl")
-
-# helpers
-include("termstructures/bond_helpers.jl")
-include("termstructures/rate_helpers.jl")
 
 # nonlinear fitting methods
 include("termstructures/nonlinear_fitting_methods.jl")

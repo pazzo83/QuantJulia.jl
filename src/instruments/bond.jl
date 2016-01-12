@@ -1,7 +1,6 @@
 using QuantJulia.Time
 
 type FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, C <: BusinessCalendar, P <: PricingEngine} <: Bond
-  price::Quote
   settlementDays::I
   faceAmount::Float64
   schedule::Schedule
@@ -18,7 +17,7 @@ type FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, C <
   settlementValue::Float64
 end
 
-function FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, C <: BusinessCalendar, P <: PricingEngine}(price::Quote, settlementDays::I, faceAmount::Float64, schedule::Schedule, coup_rate::Float64, dc::DC, paymentConvention::B,
+function FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, C <: BusinessCalendar, P <: PricingEngine}(settlementDays::I, faceAmount::Float64, schedule::Schedule, coup_rate::Float64, dc::DC, paymentConvention::B,
   redemption::Float64, issueDate::Date, calendar::C, pricing_engine::P)
   maturityDate = schedule.dates[end]
 
@@ -36,7 +35,7 @@ function FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention,
 
   coups = FixedRateLeg(schedule, faceAmount, coup_rate, calendar, paymentConvention, dc)
 
-  return FixedRateBond(price, settlementDays, faceAmount, schedule, coups, dc, paymentConvention, redemption, calendar, issueDate, schedule.dates[1], maturityDate, false, pricing_engine, 0.0)
+  return FixedRateBond(settlementDays, faceAmount, schedule, coups, dc, paymentConvention, redemption, calendar, issueDate, schedule.dates[1], maturityDate, false, pricing_engine, 0.0)
 end
 
 type FloatingRateBond{I <: Integer, X <: InterestRateIndex, DC <: DayCount, B <: BusinessDayConvention, C <: BusinessCalendar, P <: PricingEngine} <: Bond
@@ -95,7 +94,6 @@ function ZeroCouponBond{I <: Integer, B <: BusinessCalendar, C <: BusinessDayCon
   return ZeroCouponBond(settlementDays, calendar, faceAmount, maturityDate, paymentConvention, redemption, redemption_cf, issueDate, 0.0, false, pe)
 end
 
-value(b::FixedRateBond) = b.price.value
 get_settlement_date{B <: Bond}(b::B) = b.issueDate
 
 function notional{B <: Bond}(bond::B, d::Date)
@@ -133,5 +131,16 @@ function npv{B <: Bond, P <: PricingEngine}(bond::B, pe::P)
   return bond.settlementValue
 end
 
+clean_price{B <: Bond}(bond::B, settlement_value::Float64, settlement_date::Date) = dirty_price(bond, settlement_value, settlement_date) - accrued_amount(bond, settlement_date)
+dirty_price{B <: Bond}(bond::B, settlement_value::Float64, settlement_date::Date) = settlement_value * 100.0 / bond.faceAmount # replace with notionals
+
 clean_price{B <: Bond}(bond::B) = clean_price(bond, bond.settlementValue, settlement_date(bond))
 dirty_price{B <: Bond}(bond::B) = dirty_price(bond, bond.settlementValue, settlement_date(bond))
+
+function settlement_date{B <: Bond}(bond::B, d::Date = Date())
+  if d == Date()
+    d = settings.evaluation_date
+  end
+
+  return d + Base.Dates.Day(bond.settlementDays)
+end
