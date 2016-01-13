@@ -17,6 +17,20 @@ function ConstantOptionVolatility{I <: Integer, B <: BusinessCalendar, C <: Busi
   ConstantOptionVolatility(settlementDays, ref_date, calendar, bdc, volatility, dc)
 end
 
+# Swaption Volatility structures
+type ConstantSwaptionVolatility{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount} <: SwaptionVolatilityStructure
+  settlementDays::I
+  referenceDate::Date
+  cal::B
+  bdc::C
+  volatility::Quote
+  dc::DC
+end
+
+# floating reference date, floating market data
+ConstantSwaptionVolatility{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount}(settlementDays::I, cal::B, bdc::C, volatility::Quote, dc::DC) =
+                          ConstantSwaptionVolatility(settlementDays, Date(), cal, bdc, volatility, dc)
+
 function black_varience(ovs::OptionletVolatilityStructure, option_date::Date, strike::Float64)
   v = calc_volatility(ovs, option_date, strike)
   t = time_from_reference(ovs, option_date)

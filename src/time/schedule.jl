@@ -50,10 +50,10 @@ function Schedule{B <: BusinessDayConvention, C <: BusinessCalendar}(effectiveDa
   # this way is about 5-10 microseconds faster for semiannual freq over 25 years
   dates = Vector{Date}()
   dt = effectiveDate
-  push!(dates, dt)
+  push!(dates, adjust(cal, convention, dt))
   dt += tenor.period
   while dt < terminationDate
-    push!(dates, dt)
+    push!(dates, adjust(cal, convention, dt))
     dt += tenor.period
   end
 

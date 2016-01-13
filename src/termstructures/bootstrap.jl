@@ -57,7 +57,12 @@ function apply_termstructure!{T <: TermStructure}(s::SwapRateHelper, ts::T)
 end
 
 # BOOTSTRAPPING
-type IterativeBootstrap <: Bootstrap end
+type IterativeBootstrap <: Bootstrap
+  firstSolver::BrentSolver
+  solver::FiniteDifferenceNewtonSafe
+
+  IterativeBootstrap() = new(BrentSolver(), FiniteDifferenceNewtonSafe())
+end
 
 # returns initial bootstrap state to Term Structure
 function initialize{T <: TermStructure}(::IterativeBootstrap, ts::T)
@@ -90,7 +95,7 @@ function initialize{T <: TermStructure}(::IterativeBootstrap, ts::T)
   QuantJulia.Math.initialize!(ts.interp, ts.times, ts.data)
 end
 
-function calculate!{T <: TermStructure, S <: Solver1D, SS <: Solver1D}(::Bootstrap, ts::T, solver::S, first_solver::SS)
+function _calculate!{T <: TermStructure}(boot::IterativeBootstrap, ts::T)
   max_iter = max_iterations(ts.trait)
   valid_data = ts.validCurve
   ts.calculated = true
@@ -121,9 +126,9 @@ function calculate!{T <: TermStructure, S <: Solver1D, SS <: Solver1D}(::Bootstr
       # put this in a try / catch
       if !valid_data
         # use first solver
-        root = solve(first_solver, ts.errors[i], ts.accuracy, g, min, max)
+        root = solve(boot.firstSolver, ts.errors[i], ts.accuracy, g, min, max)
       else
-        root = solve(solver, ts.errors[i], ts.accuracy, g, min, max)
+        root = solve(boot.solver, ts.errors[i], ts.accuracy, g, min, max)
       end
     end
 
@@ -161,5 +166,5 @@ function bootstrap_error{I <: Integer, T <: BootstrapHelper, Y <: YieldTermStruc
   return bootstrap_error_inner
 end
 
-quote_error{B <: BondHelper}(inst::B) = QuantJulia.value(inst) - implied_quote(inst, true) # recalculate
+quote_error{B <: BondHelper}(inst::B) = QuantJulia.value(inst) - implied_quote(inst) # recalculate
 quote_error{R <: RateHelper}(rate::R) = QuantJulia.value(rate) - implied_quote(rate)

@@ -31,9 +31,11 @@ include("math/Math.jl")
 
 export
     # abstract_types.jl
-    CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap, BootstrapHelper, BondHelper, RateHelper,
+    LazyObject, calculate!, recalculate!,
+    
+    Exercise, EarlyExercise, CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap, BootstrapHelper, BondHelper, RateHelper,
     FittingMethod, CashFlows, CashFlow, Coupon, CouponPricer, IborCouponPricer, Instrument, Bond, Swap, SwapType, PricingEngine, Duration, AbstractRate, Results,
-    InterestRateIndex, AbstractCurrency,
+    InterestRateIndex, AbstractCurrency, CalibrationHelper,
 
     # quotes/Quotes.jl
     Quote,
@@ -44,6 +46,9 @@ export
     # InterestRates.jl
     ContinuousCompounding, SimpleCompounding, CompoundedCompounding, SimpleThenCompounded, ModifiedDuration,
     InterestRate, discount_factor, compound_factor, equivalent_rate, implied_rate,
+
+    # exericise.jl
+    AmericanExercise, BermudanExercise, EuropeanExercise,
 
     # Indexes
     IborIndex, LiborIndex, fixing_date, maturity_date, fixing, forecast_fixing, euribor_index, usd_libor_index,
@@ -59,10 +64,13 @@ export
     BlackIborCouponPricer, IborCoupon, IborLeg, update_pricer!,
 
     # instruments/bond.jl
-    FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv, clean_price, dirty_price, accrued_amount, 
+    FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv, clean_price, dirty_price, accrued_amount,
 
     # instruments/swap.jl
-    Payer, Receiver, SwapResults, VanillaSwap,
+    Payer, Receiver, SwapResults, VanillaSwap, fair_rate,
+
+    # instruments/swaption.jl
+    SettlementCash, SettlementPhysical, Swaption,
 
     # termstructures/bond_helpers.jl
     FixedRateBondHelper, implied_quote,
@@ -82,7 +90,7 @@ export
     max_date, discount, calculate!, initialize!, value,
 
     # termstructures/vol_term_structure.jl
-    ConstantOptionVolatility,
+    ConstantOptionVolatility, ConstantSwaptionVolatility,
 
     # termstructures/bootstrap.jl
     Discount, guess, min_value_after, max_value_after,
@@ -92,7 +100,10 @@ export
     ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, CubicBSplinesFitting, discount_function, guess_size,
 
     # pricing_engines/pricing_engines.jl
-    DiscountingBondEngine, DiscountingSwapEngine, calculate
+    DiscountingBondEngine, DiscountingSwapEngine, calculate,
+
+    # models/calibration_helpers.jl
+    SwaptionHelper, add_times_to!
 
 # abstract types
 include("abstract_types.jl")
@@ -106,6 +117,9 @@ include("currencies/currencies.jl")
 # Interest Rates ---------------------------------
 include("InterestRates.jl")
 
+# Exercise---------------------------------
+include("exercise.jl")
+
 # Indexes
 include("indexes/indexes.jl")
 
@@ -118,6 +132,7 @@ include("cash_flows/floating_rate_coupon.jl")
 # bond
 include("instruments/bond.jl")
 include("instruments/swap.jl")
+include("instruments/swaption.jl")
 
 # helpers
 include("termstructures/bond_helpers.jl")
@@ -139,6 +154,9 @@ include("termstructures/nonlinear_fitting_methods.jl")
 
 # Pricing Engines ------------------------
 include("pricing_engines/pricing_engines.jl")
+
+# Models ---------------------------------
+include("models/calibration_helpers.jl")
 
 # # Helpers NOW IN TERM STRUCTURE
 # include("helpers/bond_helpers.jl")

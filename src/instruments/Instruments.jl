@@ -1,8 +1,16 @@
-# module Instruments
-# module Instruments
+## TOP LEVEL CALCULATION METHODS - KEEPING TRACK OF CALCULATION STATE ##
+function calculate!{I <: Instrument}(inst::I)
+  if !inst.calculated
+    inst.calculated = true
+    perform_calculations!(inst)
+  end
 
-# define abstract types
+  return inst
+end
 
+function recalculate!{I <: Instrument}(inst::I)
+  inst.calculated = false
+  calculate!(inst)
 
-
-# end
+  return inst
+end

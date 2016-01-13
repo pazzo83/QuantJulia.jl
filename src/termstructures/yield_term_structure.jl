@@ -3,13 +3,13 @@ using QuantJulia.Time
 
 type NullYieldTermStructure <: YieldTermStructure end
 
-function calculate!{T <: TermStructure}(ts::T, recalculate::Bool=false)
-  if !ts.calculated || recalculate
-    _calculate!(ts)
-  end
-
-  return ts
-end
+# function calculate!{T <: TermStructure}(ts::T, recalculate::Bool=false)
+#   if !ts.calculated || recalculate
+#     _calculate!(ts)
+#   end
+#
+#   return ts
+# end
 
 type JumpDate
   ts_quote::Quote
@@ -25,12 +25,12 @@ discount{T <: YieldTermStructure}(yts::T, date::Date) = discount(yts, time_from_
 
 function discount{T <: YieldTermStructure}(yts::T, time_frac::Float64)
   disc = discount_impl(yts, time_frac)
-  if length(yts.jump_times) == 0
+  if length(yts.jumpTimes) == 0
     return disc
   end
 
   jump_effect = 1.0
-  for jump in yts.jump_times
+  for jump in yts.jumpTimes
     if jump.ts_time > 0.0 && jump.ts_time < time
       if jump.ts_quote.value > 0.0 && jump.ts_quote.value <= 1.0
         jump_effect *= jump.ts_quote.value
@@ -90,12 +90,14 @@ type FlatForwardTermStructure{I <: Integer, B <: BusinessCalendar, DC <: DayCoun
   comp::C
   freq::F
   rate::InterestRate
+  jumpTimes::Vector{JumpTime}
+  jumpDates::Vector{JumpDate}
 end
 
 function FlatForwardTermStructure{I <: Integer, B <: BusinessCalendar, DC <: DayCount, C <: CompoundingType, F <: Frequency}(settlement_days::I, referenceDate::Date, calendar::B, forward::Quote, dc::DC,
                                   comp::C = ContinuousCompounding(), freq::F = QuantJulia.Time.Annual())
   rate = InterestRate(forward.value, dc, comp, freq)
-  FlatForwardTermStructure(settlement_days, referenceDate, calendar, forward, dc, comp, freq, rate)
+  FlatForwardTermStructure(settlement_days, referenceDate, calendar, forward, dc, comp, freq, rate, Vector{JumpTime}(0), Vector{JumpDate}(0))
 end
 
 FlatForwardTermStructure{B <: BusinessCalendar, DC <: DayCount, C <: CompoundingType, F <: Frequency}(referenceDate::Date, calendar::B, forward::Quote, dc::DC, comp::C = ContinuousCompounding(), freq::F = QuantJulia.Time.Annual()) =

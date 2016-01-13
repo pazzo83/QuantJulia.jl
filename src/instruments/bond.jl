@@ -104,7 +104,15 @@ function notional{B <: Bond}(bond::B, d::Date)
   end
 end
 
-# bond functions
+# Calculation method
+function perform_calculations!{B <: Bond}(bond::B)
+  bond.settlementValue = 0.0 # reset - TODO this will be expanded
+  _calculate!(bond.pricingEngine, bond)
+
+  return bond
+end
+
+# bond methods
 accrued_amount{B <: Bond}(bond::B, settlement::Date) = accrued_amount(bond.cashflows, settlement, false) * 100.0 / notional(bond, settlement)
 
 maturity_date{B <: Bond}(bond::B) = maturity_date(bond.cashflows)
@@ -126,8 +134,13 @@ function duration{B <: Bond, DC <: DayCount, C <: CompoundingType, F <: Frequenc
   return duration(bond, y, duration_, dc, settlement_date)
 end
 
-function npv{B <: Bond, P <: PricingEngine}(bond::B, pe::P)
-  calculate!(pe, bond)
+# function npv{B <: Bond, P <: PricingEngine}(bond::B, pe::P)
+#   calculate!(pe, bond)
+#   return bond.settlementValue
+# end
+function npv{B <: Bond}(bond::B)
+  calculate!(bond)
+
   return bond.settlementValue
 end
 

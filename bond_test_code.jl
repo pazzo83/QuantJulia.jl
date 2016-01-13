@@ -320,9 +320,9 @@ function generate_discounting_ts(sett::Date)
 
   yts = PiecewiseYieldCurve(settlement_date, insts, dc, interp, trait, 0.00000000001, bootstrap)
 
-  solver = QuantJulia.Math.BrentSolver()
-  solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
-  calculate!(bootstrap, yts, solver2, solver)
+  # solver = QuantJulia.Math.BrentSolver()
+  # solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
+  calculate!(yts)
 
   return yts
 end
@@ -339,9 +339,9 @@ function main()
 
   yts = PiecewiseYieldCurve(issue_date, bonds, dc, interp, trait, 0.00000000001, bootstrap)
 
-  solver = QuantJulia.Math.BrentSolver()
-  solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
-  calculate!(IterativeBootstrap(), yts, solver2, solver)
+  # solver = QuantJulia.Math.BrentSolver()
+  # solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
+  calculate!(yts)
 
   esf = ExponentialSplinesFitting(true, length(bonds))
   esf_fitted_curve = FittedBondDiscountCurve(0, issue_date, calendar, bonds, dc, esf, 1e-10, 5000, 1.0)
@@ -463,9 +463,9 @@ function main3()
 
   yts = PiecewiseYieldCurve(settlement_date, insts, dc, interp, trait, 1e-15, bootstrap)
 
-  solver = QuantJulia.Math.BrentSolver()
-  solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
-  calculate!(bootstrap, yts, solver2, solver)
+  # solver = QuantJulia.Math.BrentSolver()
+  # solver2 = QuantJulia.Math.FiniteDifferenceNewtonSafe()
+  calculate!(yts)
 
   disc_yts = generate_discounting_ts(settlement_date)
 
@@ -494,7 +494,7 @@ function main3()
   println("")
   println("              ZC      Fixed    Floating  ")
   println("-----------------------------------------")
-  println(@sprintf("  NPV       %.2f   %.2f   %.2f", npv(zcb, zcb.pricingEngine), npv(fxb, fxb.pricingEngine), npv(fb, fb.pricingEngine)))
+  println(@sprintf("  NPV       %.2f   %.2f   %.2f", npv(zcb), npv(fxb), npv(fb)))
   println(@sprintf(" Clean      %.2f   %.2f   %.2f", clean_price(zcb), clean_price(fxb), clean_price(fb)))
   println(@sprintf(" Dirty      %.2f   %.2f   %.2f", dirty_price(zcb), dirty_price(fxb), dirty_price(fb)))
   println(@sprintf("accrued      %.2f     %.2f     %.2f", accrued_amount(zcb, settlement_date), accrued_amount(fxb, settlement_date), accrued_amount(fb, settlement_date)))

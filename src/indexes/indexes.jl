@@ -14,6 +14,10 @@ type IborIndex{S <: AbstractString, I <: Integer, B <: BusinessCalendar, C <: Bu
   call{S, I, B, C, DC}(::Type{IborIndex}, familyName::S, tenor::TenorPeriod, fixingDays::I, currency::AbstractCurrency, fixingCalendar::B,
                                 convention::C, endOfMonth::Bool, dc::DC) =
     new{S, I, B, C, DC, TermStructure}(familyName, tenor, fixingDays, currency, fixingCalendar, convention, endOfMonth, dc)
+
+  call{S, I, B, C, DC, T}(::Type{IborIndex}, familyName::S, tenor::TenorPeriod, fixingDays::I, currency::AbstractCurrency, fixingCalendar::B,
+                                convention::C, endOfMonth::Bool, dc::DC, ts::T) =
+    new{S, I, B, C, DC, T}(familyName, tenor, fixingDays, currency, fixingCalendar, convention, endOfMonth, dc, ts)
 end
 
 type LiborIndex{S <: AbstractString, I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount, T <: TermStructure} <: InterestRateIndex
@@ -80,10 +84,8 @@ end
 maturity_date(idx::LiborIndex, d::Date) = advance(idx.tenor.period, idx.jointCalendar, d, idx.convention)
 
 # types of indexes
-function euribor_index(tenor::TenorPeriod)
-  return IborIndex("Euribor", tenor, 2, EURCurrency(), QuantJulia.Time.TargetCalendar(), euribor_conv(tenor.period), euribor_eom(tenor.period),
-                  QuantJulia.Time.Actual360())
-end
+euribor_index(tenor::TenorPeriod) = IborIndex("Euribor", tenor, 2, EURCurrency(), QuantJulia.Time.TargetCalendar(), euribor_conv(tenor.period), euribor_eom(tenor.period), QuantJulia.Time.Actual360())
+euribor_index{T <: TermStructure}(tenor::TenorPeriod, ts::T) = IborIndex("Euribor", tenor, 2, EURCurrency(), QuantJulia.Time.TargetCalendar(), euribor_conv(tenor.period), euribor_eom(tenor.period), QuantJulia.Time.Actual360(), ts)
 
 function usd_libor_index(tenor::TenorPeriod)
   return LiborIndex("USDLibor", tenor, 2, USDCurrency(), QuantJulia.Time.USSettlementCalendar(), QuantJulia.Time.Actual360())

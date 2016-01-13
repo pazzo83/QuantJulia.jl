@@ -119,11 +119,8 @@ function discount_impl{C <: InterpolatedCurve}(curve::C, t::Float64)
   # do flat fwd extrapolation
 end
 
-function _calculate!{C <: InterpolatedCurve}(curve::C, recalculate::Bool = false)
-  if !curve.calculated || recalculate
-    curve.calculated = true
-    calculate!(curve.boot)
-  end
+function perform_calculations!{C <: InterpolatedCurve}(curve::C)
+  _calculate!(curve.boot, curve)
   return curve
 end
 
@@ -169,7 +166,7 @@ function initialize!(curve::FittedBondDiscountCurve)
   return curve
 end
 
-function _calculate!(curve::FittedBondDiscountCurve)
+function perform_calculations!(curve::FittedBondDiscountCurve)
   cost_f = curve.fittingMethod.commons.costFunction
   constraint = NoConstraint()
 
@@ -201,7 +198,6 @@ function _calculate!(curve::FittedBondDiscountCurve)
   curve.fittingMethod.commons.minimumCostValue = cost_value
 
   # we have calculated
-  curve.calculated = true
 
   return curve
 end
