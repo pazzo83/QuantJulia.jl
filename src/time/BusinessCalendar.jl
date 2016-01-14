@@ -75,10 +75,10 @@ function easter_date{I <: Integer}(y::I)
 end
 
 # calendar functions
-advance{B <: BusinessDayConvention}(time_period::Day, cal::NullCalendar, dt::Date, ::B) = dt += time_period
-advance{B <: BusinessDayConvention}(time_period::Union{Week, Month, Year}, cal::NullCalendar, dt::Date, ::B) = dt += time_period
+# advance{B <: BusinessDayConvention}(time_period::Day, cal::NullCalendar, dt::Date, ::B) = dt += time_period
+# advance{B <: BusinessDayConvention}(time_period::Union{Week, Month, Year}, cal::NullCalendar, dt::Date, ::B) = dt += time_period
 
-function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(days::Day, cal::C, dt::Date, biz_conv::B)
+function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(days::Day, cal::C, dt::Date, biz_conv::B = Following())
   n = Int(days)
   if n > 0
     while n > 0
@@ -101,11 +101,12 @@ function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(days::Day, c
   return dt
 end
 
-function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(time_period::Union{Week, Month, Year}, cal::C, dt::Date, biz_conv::B)
+function advance{C <: BusinessCalendar, B <: BusinessDayConvention}(time_period::Union{Week, Month, Year}, cal::C, dt::Date, biz_conv::B = Following())
   dt += time_period
   return adjust(cal, biz_conv, dt)
 end
 
+is_business_day(cal::NullCalendar, ::Date) = true
 
 function is_business_day{C <: BusinessCalendar}(cal::C, dt::Date)
   if dayofweek(dt) in [6, 7] || is_holiday(cal, dt)

@@ -67,7 +67,7 @@ function VanillaSwap{ST <: SwapType, DC_fix <: DayCount, DC_float <: DayCount, B
 
   results = SwapResults(2)
 
-  return VanillaSwap(swapT, nominal, fixedSchedule, fixedRate, fixedDayCount, iborIndex, spread, floatSchedule, floatDayCount, paymentConvention, legs, payer, pricingEngine, results, false)
+  return VanillaSwap{ST, DC_fix, DC_float, B, Leg, P}(swapT, nominal, fixedSchedule, fixedRate, fixedDayCount, iborIndex, spread, floatSchedule, floatDayCount, paymentConvention, legs, payer, pricingEngine, results, false)
 end
 
 # Swap Helper methods

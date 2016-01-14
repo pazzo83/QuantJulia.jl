@@ -54,6 +54,10 @@ function operator(finder::IRRFinder)
   return _inner
 end
 
+get_latest_coupon{L <: Leg}(leg::L) = get_latest_coupon(leg, leg.coupons[end])
+get_latest_coupon{L <: Leg}(leg::L, simp::SimpleCashFlow) = leg.coupons[end - 1]
+get_latest_coupon{L <: Leg, C <: Coupon}(leg::L, coup::C) = coup
+
 ## Pricer Methods ##
 # function initialize!(pricer::IborCouponPricer, coupon::IborCoupon)
 #   # stuff

@@ -42,8 +42,7 @@ type IborCoupon{I <: Integer, X <: InterestRateIndex, DC <: DayCount, ICP <: Ibo
 end
 
 function IborCoupon{I <: Integer, X <: InterestRateIndex, DC <: DayCount, ICP <: IborCouponPricer}(paymentDate::Date, nominal::Float64, startDate::Date, endDate::Date, fixingDays::I, iborIndex::X,
-                    gearing::Float64, spread::Float64, refPeriodStart::Date, refPeriodEnd::Date, dc::DC, isInArrears::Bool,
-                    pricer::ICP)
+                    gearing::Float64, spread::Float64, refPeriodStart::Date, refPeriodEnd::Date, dc::DC, isInArrears::Bool, pricer::ICP)
   # TODO check if right fixing days
   _fixing_date = isInArrears ? fixing_date(iborIndex, endDate) : fixing_date(iborIndex, startDate)
   fixing_cal = iborIndex.fixingCalendar
@@ -61,7 +60,7 @@ function IborCoupon{I <: Integer, X <: InterestRateIndex, DC <: DayCount, ICP <:
 
   ## TODO ensure positive (> 0) spanning_time
 
-  return IborCoupon(paymentDate, nominal, startDate, endDate, _fixing_date, fixing_val_date, fixing_end_date, fixingDays, iborIndex, gearing, spread,
+  return IborCoupon{I, X, DC, ICP}(paymentDate, nominal, startDate, endDate, _fixing_date, fixing_val_date, fixing_end_date, fixingDays, iborIndex, gearing, spread,
                     refPeriodStart, refPeriodEnd, dc, isInArrears, spanning_time, pricer, -1.0)
 end
 

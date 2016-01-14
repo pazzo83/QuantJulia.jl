@@ -4,7 +4,8 @@ using QuantJulia.Math, QuantJulia.Time
 
 type NullCurve <: Curve end
 
-type PiecewiseYieldCurve{B <: BootstrapHelper, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait} <: InterpolatedCurve{B, DC, P, T}
+type PiecewiseYieldCurve{I <: Integer, B <: BootstrapHelper, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait} <: InterpolatedCurve{B, DC, P, T}
+  settlementDays::I
   referenceDate::Date
   instruments::Vector{B}
   dc::DC
@@ -24,7 +25,8 @@ function PiecewiseYieldCurve{B <: BootstrapHelper, DC <: DayCount, P <: Interpol
   # get the initial length of instruments
   n = length(instruments)
   # create an initial state of the curve
-  pyc = PiecewiseYieldCurve(referenceDate,
+  pyc = PiecewiseYieldCurve(0,
+                            referenceDate,
                             instruments,
                             dc,
                             interp,

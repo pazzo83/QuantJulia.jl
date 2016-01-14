@@ -28,6 +28,7 @@ abstract AbstractRate <: Instrument
 abstract Swap <: Instrument
 abstract SettlementType
 abstract Option <: Instrument
+abstract OptionType
 abstract SwapType
 abstract Results
 

@@ -67,6 +67,10 @@ export BSpline, spline_oper, N
 # Constants
 const EPS_VAL = eps()
 
+# distribution.jl
+export distribution_derivative
+include("distributions.jl")
+
 # interpolation.jl
 export Interpolation, LogInterpolation, update!, locate, initialize!, value
 

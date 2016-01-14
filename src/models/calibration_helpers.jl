@@ -76,3 +76,8 @@ function add_times_to!(swaptionHelper::SwaptionHelper)
 
   return swaptionHelper
 end
+
+function black_price(swaptionHelper::SwaptionHelper, sigma::Float64)
+  calculate!(swaptionHelper)
+  # stuff
+end

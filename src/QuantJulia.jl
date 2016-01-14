@@ -32,7 +32,7 @@ include("math/Math.jl")
 export
     # abstract_types.jl
     LazyObject, calculate!, recalculate!,
-    
+
     Exercise, EarlyExercise, CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap, BootstrapHelper, BondHelper, RateHelper,
     FittingMethod, CashFlows, CashFlow, Coupon, CouponPricer, IborCouponPricer, Instrument, Bond, Swap, SwapType, PricingEngine, Duration, AbstractRate, Results,
     InterestRateIndex, AbstractCurrency, CalibrationHelper,
@@ -65,6 +65,9 @@ export
 
     # instruments/bond.jl
     FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv, clean_price, dirty_price, accrued_amount,
+
+    # instruments/option.jl
+    Put, Call,
 
     # instruments/swap.jl
     Payer, Receiver, SwapResults, VanillaSwap, fair_rate,
@@ -131,6 +134,7 @@ include("cash_flows/floating_rate_coupon.jl")
 # Instruments ------------------------
 # bond
 include("instruments/bond.jl")
+include("instruments/option.jl")
 include("instruments/swap.jl")
 include("instruments/swaption.jl")
 

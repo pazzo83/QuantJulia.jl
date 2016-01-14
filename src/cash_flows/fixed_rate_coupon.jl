@@ -30,7 +30,7 @@ type FixedRateLeg <: Leg
     end_date = schedule.dates[2]
     payment_date = adjust(calendar, paymentConvention, end_date)
     #TODO: setup payment adjustments and the like
-    coups[1] = FixedRateCoupon(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
+    coups[1] = FixedRateCoupon{DC}(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
 
     # build coupons
     count = 2
@@ -38,7 +38,7 @@ type FixedRateLeg <: Leg
     end_date = count == length(schedule.dates) ? schedule.dates[end] : schedule.dates[count + 1]
     payment_date = adjust(calendar, paymentConvention, end_date)
     while start_date < schedule.dates[end]
-      @inbounds coups[count] = FixedRateCoupon(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
+      @inbounds coups[count] = FixedRateCoupon{DC}(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
 
       count += 1
       start_date = end_date

@@ -1,6 +1,5 @@
 type AmericanExercise <: EarlyExercise
-  earliestDate::Date
-  latestDate::Date
+  dates::Vector{Date}
 end
 
 type BermudanExercise <: EarlyExercise
@@ -8,5 +7,7 @@ type BermudanExercise <: EarlyExercise
 end
 
 type EuropeanExercise <: Exercise
-  date::Date
+  dates::Vector{Date}
 end
+
+EuropeanExercise(d::Date) = EuropeanExercise([d])
