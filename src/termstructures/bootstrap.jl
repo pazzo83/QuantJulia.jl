@@ -98,8 +98,7 @@ end
 function _calculate!{T <: TermStructure}(boot::IterativeBootstrap, ts::T)
   max_iter = max_iterations(ts.trait)
   valid_data = ts.validCurve
-  ts.calculated = true
-
+  
   iterations = 0
   # if we get through this loop, we haven't converged
   while iterations < max_iter

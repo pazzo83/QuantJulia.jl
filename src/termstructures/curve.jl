@@ -5,6 +5,7 @@ using QuantJulia.Math, QuantJulia.Time
 type NullCurve <: Curve end
 
 type PiecewiseYieldCurve{I <: Integer, B <: BootstrapHelper, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait} <: InterpolatedCurve{B, DC, P, T}
+  lazyMixin::LazyMixin
   settlementDays::I
   referenceDate::Date
   instruments::Vector{B}
@@ -17,7 +18,6 @@ type PiecewiseYieldCurve{I <: Integer, B <: BootstrapHelper, DC <: DayCount, P <
   data::Vector{Float64}
   errors::Vector{Function}
   validCurve::Bool
-  calculated::Bool
 end
 
 function PiecewiseYieldCurve{B <: BootstrapHelper, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait}(referenceDate::Date, instruments::Vector{B}, dc::DC, interp::P, trait::T,
@@ -25,7 +25,8 @@ function PiecewiseYieldCurve{B <: BootstrapHelper, DC <: DayCount, P <: Interpol
   # get the initial length of instruments
   n = length(instruments)
   # create an initial state of the curve
-  pyc = PiecewiseYieldCurve(0,
+  pyc = PiecewiseYieldCurve(LazyMixin(),
+                            0,
                             referenceDate,
                             instruments,
                             dc,
@@ -36,7 +37,6 @@ function PiecewiseYieldCurve{B <: BootstrapHelper, DC <: DayCount, P <: Interpol
                             Vector{Float64}(n + 1),
                             Vector{Float64}(n + 1),
                             Vector{Function}(n + 1),
-                            false,
                             false)
 
   # initialize the bootstrapping
@@ -46,6 +46,7 @@ function PiecewiseYieldCurve{B <: BootstrapHelper, DC <: DayCount, P <: Interpol
 end
 
 type FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: BondHelper, DC <: DayCount, F <: FittingMethod} <: Curve
+  lazyMixin::LazyMixin
   settlementDays::I
   referenceDate::Date
   calendar::C
@@ -55,7 +56,6 @@ type FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: BondHelpe
   accuracy::Float64
   maxEvaluations::I
   simplexLambda::Float64
-  calculated::Bool
 
   FittedBondDiscountCurve(settlementDays::I,
                           referenceDate::Date,
@@ -67,7 +67,7 @@ type FittedBondDiscountCurve{I <: Integer, C <: BusinessCalendar, B <: BondHelpe
                           maxEvaluations::I,
                           simplexLambda::Float64) =
 
-                          (x = new(settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda, false);
+                          (x = new(LazyMixin(), settlementDays, referenceDate, calendar, bonds, dc, fittingMethod, accuracy, maxEvaluations, simplexLambda);
                           x.fittingMethod.commons.costFunction.curve = x)
 
   # FittedBondDiscountCurve(settlementDays::Integer, referenceDate::Date, calendar::BusinessCalendar, bonds::Vector{B}, dc::DayCount, fittingMethod::FittingMethod, accuracy::Float64=1e-10,

@@ -1,22 +1,6 @@
 # Lazy Object
 abstract LazyObject
 
-function calculate!{L <: LazyObject}(lazy::L)
-  if !lazy.calculated
-    lazy.calculated = true
-    perform_calculations!(lazy)
-  end
-
-  return lazy
-end
-
-function recalculate!{L <: LazyObject}(lazy::L)
-  lazy.calculated = false
-  calculate!(lazy)
-
-  return lazy
-end
-
 # Exercise
 abstract Exercise
 abstract EarlyExercise <: Exercise

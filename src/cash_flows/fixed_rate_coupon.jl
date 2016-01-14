@@ -1,20 +1,18 @@
 using QuantJulia.Time
 
 type FixedRateCoupon{DC <: DayCount} <: Coupon
+  couponMixin::CouponMixin{DC}
   paymentDate::Date
   nominal::Float64
   rate::InterestRate
-  accrualStartDate::Date
-  accrualEndDate::Date
-  refPeriodStart::Date
-  refPeriodEnd::Date
-  dc::DC
-  accrualPeriod::Float64
 end
+
+FixedRateCoupon{DC <: DayCount}(paymentDate::Date, faceAmount::Float64, rate::InterestRate, accrual_start::Date, accrual_end::Date, ref_start::Date, ref_end::Date, dc::DC, accrual::Float64) =
+                FixedRateCoupon(CouponMixin{DC}(accrual_start, accrual_end, ref_start, ref_end, dc, accrual), paymentDate, faceAmount, rate)
 
 ## COUPON METHODS ##
 amount(coup::FixedRateCoupon) =
-        coup.nominal * (compound_factor(coup.rate, coup.accrualStartDate, coup.accrualEndDate, coup.refPeriodStart, coup.refPeriodEnd) - 1)
+        coup.nominal * (compound_factor(coup.rate, accrual_start_date(coup), accrual_end_date(coup), ref_period_start(coup), ref_period_end(coup)) - 1)
 
 calc_rate(coup::FixedRateCoupon) = coup.rate.rate
 
@@ -30,7 +28,7 @@ type FixedRateLeg <: Leg
     end_date = schedule.dates[2]
     payment_date = adjust(calendar, paymentConvention, end_date)
     #TODO: setup payment adjustments and the like
-    coups[1] = FixedRateCoupon{DC}(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
+    coups[1] = FixedRateCoupon(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
 
     # build coupons
     count = 2
@@ -38,7 +36,7 @@ type FixedRateLeg <: Leg
     end_date = count == length(schedule.dates) ? schedule.dates[end] : schedule.dates[count + 1]
     payment_date = adjust(calendar, paymentConvention, end_date)
     while start_date < schedule.dates[end]
-      @inbounds coups[count] = FixedRateCoupon{DC}(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
+      @inbounds coups[count] = FixedRateCoupon(payment_date, faceAmount, InterestRate(rate, dc, SimpleCompounding(), schedule.tenor.freq), start_date, end_date, start_date, end_date, dc, -1.0)
 
       count += 1
       start_date = end_date
@@ -56,10 +54,10 @@ end
 
 # Coupon methods
 function accrued_amount(coup::FixedRateCoupon, settlement_date::Date)
-  if settlement_date <= coup.accrualStartDate || settlement_date > coup.paymentDate
+  if settlement_date <= accrual_start_date(coup) || settlement_date > coup.paymentDate
     return 0.0
   end
 
   return coup.nominal *
-      (compound_factor(coup.rate, coup.accrualStartDate, min(settlement_date, coup.accrualEndDate), coup.refPeriodStart, coup.refPeriodEnd) - 1.0)
+      (compound_factor(coup.rate, accrual_start_date(coup), min(settlement_date, accrual_end_date(coup)), ref_period_start(coup), ref_period_end(coup)) - 1.0)
 end

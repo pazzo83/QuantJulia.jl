@@ -5,6 +5,32 @@ using QuantJulia.Time
 
 # BlackIborCouponPricer() = BlackIborCouponPricer(0.0, 0.0, false)
 
+type CouponMixin{DC <: DayCount}
+  accrualStartDate::Date
+  accrualEndDate::Date
+  refPeriodStart::Date
+  refPeriodEnd::Date
+  dc::DC
+  accrualPeriod::Float64
+end
+
+accrual_start_date{C <: Coupon}(coup::C) = coup.couponMixin.accrualStartDate
+accrual_end_date{C <: Coupon}(coup::C) = coup.couponMixin.accrualEndDate
+ref_period_start{C <: Coupon}(coup::C) = coup.couponMixin.refPeriodStart
+ref_period_end{C <: Coupon}(coup::C) = coup.couponMixin.refPeriodEnd
+get_dc{C <: Coupon}(coup::C) = coup.couponMixin.dc
+
+# accural_period{C <: Coupon}(coup::C) = coup.couponMixin.accrualPeriod
+accrual_period!{C <: Coupon}(coup::C, val::Float64) = coup.couponMixin.accrualPeriod = val
+function accrual_period{C <: Coupon}(coup::C)
+  if coup.couponMixin.accrualPeriod == -1.0
+    p = year_fraction(get_dc(coup), accrual_start_date(coup), accrual_end_date(coup), ref_period_start(coup), ref_period_end(coup))
+    accrual_period!(coup, p)
+  end
+
+  return coup.couponMixin.accrualPeriod
+end
+
 ## types of cash flows ##
 type SimpleCashFlow <: CashFlow
   amount::Float64
@@ -16,7 +42,7 @@ date(cf::SimpleCashFlow) = cf.date
 date_accrual_end(cf::SimpleCashFlow) = cf.date
 
 date{C <: Coupon}(coup::C) = coup.paymentDate
-date_accrual_end{C <: Coupon}(coup::C) = coup.accrualEndDate
+date_accrual_end{C <: Coupon}(coup::C) = accrual_end_date(coup)
 
 # legs to build cash flows
 abstract Leg <: CashFlows
@@ -153,8 +179,8 @@ function npv{L <: Leg}(leg::L, y::InterestRate, include_settlement_cf::Bool, set
     amount_ = amount(cp)
 
     if isa(cp, Coupon)
-      ref_start_date = cp.refPeriodStart
-      ref_end_date = cp.refPeriodEnd
+      ref_start_date = ref_period_start(cp)
+      ref_end_date = ref_period_end(cp)
     else
       if last_date == npv_date
         ref_start_date = coupon_date - Dates.Year(1)
@@ -273,8 +299,8 @@ function duration{L <: Leg, DC <: DayCount}(::ModifiedDuration, leg::L, y::Inter
     c = amount(cp)
     coupon_date = date(cp)
     if isa(cp, FixedRateCoupon)
-      ref_start_date = cp.refPeriodStart
-      ref_end_date = cp.refPeriodEnd
+      ref_start_date = ref_period_start(cp)
+      ref_end_date = ref_period_end(cp)
     else
       if last_date == npv_date
         ref_start_date = coupon_date - Dates.Year(1)
@@ -356,7 +382,7 @@ end
 
 
 # functions for sorting and finding
-sort_cashflow{C <: Coupon}(cf::C) = cf.accrualEndDate
+sort_cashflow{C <: Coupon}(cf::C) = accrual_end_date(cf) #cf.couponMixin.accrualEndDate
 sort_cashflow(simp::SimpleCashFlow) = simp.date
 
 prev_cf{C <: Coupon}(cf::C, d::Date) = d > cf.paymentDate
@@ -417,15 +443,15 @@ end
 accrued_amount(cf::ZeroCouponLeg, ::Date, ::Bool= false) = 0.0
 accrued_amount(simp::SimpleCashFlow, ::Date, ::Bool = false) = 0.0
 
-accrual_period!{C <: Coupon}(coup::C, p::Float64) = coup.accrualPeriod = p
-function accrual_period{C <: Coupon}(coup::C)
-  if coup.accrualPeriod == -1.0
-    p = year_fraction(coup.dc, coup.accrualStartDate, coup.accrualEndDate, coup.refPeriodStart, coup.refPeriodEnd)
-    accrual_period!(coup, p)
-  end
-
-  return coup.accrualPeriod
-end
+# accrual_period!{C <: Coupon}(coup::C, p::Float64) = coup.accrualPeriod = p
+# function accrual_period{C <: Coupon}(coup::C)
+#   if accrual_period(coup) == -1.0
+#     p = year_fraction(get_dc(coup), accrual_start_date(coup), accrual_end_date(coup), ref_period_start(coup), ref_period_end(coup))
+#     accrual_period!(coup, p)
+#   end
+#
+#   return p
+# end
 
 function has_occurred{C <: CashFlow}(cf::C, ref_date::Date, include_settlement_cf::Bool = true)
   # will need to expand this

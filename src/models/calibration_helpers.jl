@@ -7,6 +7,7 @@ type CalibrationHelperCommon
 end
 
 type SwaptionHelper{Dm <: Dates.Period, D1 <: Dates.Period, DC_fix <: DayCount, DC_float <: DayCount, T <: YieldTermStructure} <: CalibrationHelper
+  lazyMixin::LazyMixin
   exerciseDate::Date
   endDate::Date
   maturity::Dm
@@ -21,18 +22,17 @@ type SwaptionHelper{Dm <: Dates.Period, D1 <: Dates.Period, DC_fix <: DayCount, 
   shift::Float64
   exerciseRate::Float64
   calibCommon::CalibrationHelperCommon
-  calculated::Bool
   yts::T
   swaption::Swaption
 
   SwaptionHelper(exerciseDate::Date, endDate::Date, maturity::Dm, swapLength::D1, volatility::Quote, iborIndex::IborIndex, fixedLegTenor::TenorPeriod, fixedLegDayCount::DC_fix,
                 floatingLegDayCount::DC_float, strike::Float64, nominal::Float64, shift::Float64, exerciseRate::Float64, yts::T) =
-                new(exerciseDate, endDate, maturity, swapLength, volatility, iborIndex, fixedLegTenor, fixedLegDayCount, floatingLegDayCount, strike, nominal, shift, exerciseRate, CalibrationHelperCommon(), false, yts)
+                new(LazyMixin(), exerciseDate, endDate, maturity, swapLength, volatility, iborIndex, fixedLegTenor, fixedLegDayCount, floatingLegDayCount, strike, nominal, shift, exerciseRate, CalibrationHelperCommon(), yts)
 end
 
 SwaptionHelper{Dm <: Dates.Period, D1 <: Dates.Period, DC_fix <: DayCount, DC_float <: DayCount, T <: YieldTermStructure}(maturity::Dm, swapLength::D1, volatility::Quote, iborIndex::IborIndex, fixedLegTenor::TenorPeriod,
               fixedLegDayCount::DC_fix, floatingLegDayCount::DC_float, strike::Float64, nominal::Float64, shift::Float64, exerciseRate::Float64, yts::T) =
-              SwaptionHelper{Dm, Dl, DC_fix, DC_float, T}(Date(), Date(), maturity, swapLength, volatility, index, fixedLegTenor, fixedLegDayCount, floatingLegDayCount, strike, nominal, shift, exerciseRate, false, yts)
+              SwaptionHelper{Dm, Dl, DC_fix, DC_float, T}(Date(), Date(), maturity, swapLength, volatility, index, fixedLegTenor, fixedLegDayCount, floatingLegDayCount, strike, nominal, shift, exerciseRate, yts)
 
 function perform_calculations!(SwaptionHelper::SwaptionHelper)
   calendar = swaptionHelper.iborIndex.fixingCalendar

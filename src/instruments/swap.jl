@@ -36,6 +36,7 @@ function reset!(sr::SwapResults)
 end
 
 type VanillaSwap{ST <: SwapType, DC_fix <: DayCount, DC_float <: DayCount, B <: BusinessDayConvention, L <: Leg, P <: PricingEngine} <: Swap
+  lazyMixin::LazyMixin
   swapT::ST
   nominal::Float64
   fixedSchedule::Schedule
@@ -50,7 +51,6 @@ type VanillaSwap{ST <: SwapType, DC_fix <: DayCount, DC_float <: DayCount, B <: 
   payer::Vector{Float64}
   pricingEngine::P
   results::SwapResults
-  calculated::Bool
 end
 
 # Constructors
@@ -67,7 +67,7 @@ function VanillaSwap{ST <: SwapType, DC_fix <: DayCount, DC_float <: DayCount, B
 
   results = SwapResults(2)
 
-  return VanillaSwap{ST, DC_fix, DC_float, B, Leg, P}(swapT, nominal, fixedSchedule, fixedRate, fixedDayCount, iborIndex, spread, floatSchedule, floatDayCount, paymentConvention, legs, payer, pricingEngine, results, false)
+  return VanillaSwap{ST, DC_fix, DC_float, B, Leg, P}(LazyMixin(), swapT, nominal, fixedSchedule, fixedRate, fixedDayCount, iborIndex, spread, floatSchedule, floatDayCount, paymentConvention, legs, payer, pricingEngine, results)
 end
 
 # Swap Helper methods

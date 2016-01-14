@@ -31,11 +31,14 @@ include("math/Math.jl")
 
 export
     # abstract_types.jl
-    LazyObject, calculate!, recalculate!,
+    LazyObject,
 
     Exercise, EarlyExercise, CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap, BootstrapHelper, BondHelper, RateHelper,
     FittingMethod, CashFlows, CashFlow, Coupon, CouponPricer, IborCouponPricer, Instrument, Bond, Swap, SwapType, PricingEngine, Duration, AbstractRate, Results,
     InterestRateIndex, AbstractCurrency, CalibrationHelper,
+
+    # lazy.jl
+    LazyMixin, calculate!, recalculate!,
 
     # quotes/Quotes.jl
     Quote,
@@ -54,7 +57,7 @@ export
     IborIndex, LiborIndex, fixing_date, maturity_date, fixing, forecast_fixing, euribor_index, usd_libor_index,
 
     # cash_flows/cash_flows.jl
-    SimpleCashFlow, Leg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
+    CouponMixin, accrual_start_date, accrual_end_date, ref_period_start, ref_period_end, SimpleCashFlow, Leg, ZeroCouponLeg, IRRFinder, operator, amount, date, duration, yield, previous_cashflow_date,
     accrual_days, accrual_days, next_cashflow, has_occurred, next_coupon_rate, initialize!,
 
     # cash_flows/fixed_rate_coupon.jl
@@ -110,6 +113,9 @@ export
 
 # abstract types
 include("abstract_types.jl")
+
+# lazy
+include("lazy.jl")
 
 # Quotes ----------------------------
 include("quotes/Quotes.jl")

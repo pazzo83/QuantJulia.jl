@@ -20,11 +20,10 @@ type BlackIborCouponPricer{O <: OptionletVolatilityStructure} <: IborCouponPrice
   end
 end
 
-type IborCoupon{I <: Integer, X <: InterestRateIndex, DC <: DayCount, ICP <: IborCouponPricer} <: Coupon
+type IborCoupon{DC <: DayCount, I <: Integer, X <: InterestRateIndex, ICP <: IborCouponPricer} <: Coupon
+  couponMixin::CouponMixin{DC}
   paymentDate::Date
   nominal::Float64
-  accrualStartDate::Date
-  accrualEndDate::Date
   fixingDate::Date
   fixingValueDate::Date
   fixingEndDate::Date
@@ -32,13 +31,9 @@ type IborCoupon{I <: Integer, X <: InterestRateIndex, DC <: DayCount, ICP <: Ibo
   iborIndex::X
   gearing::Float64
   spread::Float64
-  refPeriodStart::Date
-  refPeriodEnd::Date
-  dc::DC
   isInArrears::Bool
   spanningTime::Float64
   pricer::ICP
-  accrualPeriod::Float64
 end
 
 function IborCoupon{I <: Integer, X <: InterestRateIndex, DC <: DayCount, ICP <: IborCouponPricer}(paymentDate::Date, nominal::Float64, startDate::Date, endDate::Date, fixingDays::I, iborIndex::X,
@@ -60,8 +55,8 @@ function IborCoupon{I <: Integer, X <: InterestRateIndex, DC <: DayCount, ICP <:
 
   ## TODO ensure positive (> 0) spanning_time
 
-  return IborCoupon{I, X, DC, ICP}(paymentDate, nominal, startDate, endDate, _fixing_date, fixing_val_date, fixing_end_date, fixingDays, iborIndex, gearing, spread,
-                    refPeriodStart, refPeriodEnd, dc, isInArrears, spanning_time, pricer, -1.0)
+  return IborCoupon{DC, I, X, ICP}(CouponMixin{DC}(startDate, endDate, refPeriodStart, refPeriodEnd, dc, -1.0), paymentDate, nominal, _fixing_date, fixing_val_date, fixing_end_date, fixingDays, iborIndex, gearing, spread,
+                    isInArrears, spanning_time, pricer)
 end
 
 # Coupon methods
@@ -87,11 +82,11 @@ function index_fixing(coupon::IborCoupon)
 end
 
 function accrued_amount(coup::IborCoupon, settlement_date::Date)
-  if settlement_date <= coup.accrualStartDate || settlement_date > coup.paymentDate
+  if settlement_date <= accrual_start_date(coup) || settlement_date > coup.paymentDate
     return 0.0
   end
 
-  return coup.nominal * calc_rate(coup) * year_fraction(coup.dc, coup.accrualStartDate, min(settlement_date, coup.accrualEndDate), coup.refPeriodStart, coup.refPeriodEnd)
+  return coup.nominal * calc_rate(coup) * year_fraction(get_dc(coup), accrual_start_date(coup), min(settlement_date, accrual_end_date(coup)), ref_period_start(coup), ref_period_end(coup))
 end
 
 # Floating legs
