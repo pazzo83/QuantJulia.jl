@@ -5,6 +5,11 @@ abstract CostFunction
 abstract Constraint
 
 type NoConstraint <: Constraint end
+type PositiveConstraint <: Constraint end
+type BoundaryConstraint <: Constraint
+  low::Float64
+  high::Float64
+end
 
 abstract OptimizationMethod
 

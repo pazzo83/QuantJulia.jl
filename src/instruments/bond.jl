@@ -1,28 +1,28 @@
 using QuantJulia.Time
 
-type BondMixin{I <: Integer, L <: Leg, DC <: DayCount, C <: BusinessCalendar, P <: PricingEngine}
+type BondMixin{I <: Integer}
   settlementDays::I
-  schedule::Schedule
-  cashflows::L
-  dc::DC
-  calendar::C
+  # schedule::Schedule
+  # cashflows::L
+  # dc::DC
   issueDate::Date
-  pricingEngine::P
+  maturityDate::Date
+  # pricingEngine::P
 end
 
-type FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention, C <: BusinessCalendar, P <: PricingEngine} <: Bond
+get_settlement_days{B <: Bond}(bond::B) = bond.bondMixin.settlementDays
+get_issue_date{B <: Bond}(bond::B) = bond.bondMixin.issueDate
+get_maturity_date{B <: Bond}(bond::B) = bond.bondMixin.maturityDate
+
+type FixedRateBond{I <: Integer, DC <: DayCount, P <: PricingEngine} <: Bond
   lazyMixin::LazyMixin
-  settlementDays::I
+  bondMixin::BondMixin{I}
   faceAmount::Float64
   schedule::Schedule
   cashflows::FixedRateLeg
   dc::DC
-  paymentConvention::B
   redemption::Float64
-  calendar::C
-  issueDate::Date
   startDate::Date
-  maturityDate::Date
   pricingEngine::P
   settlementValue::Float64
 end
@@ -45,19 +45,17 @@ function FixedRateBond{I <: Integer, DC <: DayCount, B <: BusinessDayConvention,
 
   coups = FixedRateLeg(schedule, faceAmount, coup_rate, calendar, paymentConvention, dc)
 
-  return FixedRateBond(LazyMixin(), settlementDays, faceAmount, schedule, coups, dc, paymentConvention, redemption, calendar, issueDate, schedule.dates[1], maturityDate, pricing_engine, 0.0)
+  return FixedRateBond{I, DC, P}(LazyMixin(), BondMixin{I}(settlementDays, issueDate, maturityDate), faceAmount, schedule, coups, dc, redemption, schedule.dates[1], pricing_engine, 0.0)
 end
 
-type FloatingRateBond{I <: Integer, X <: InterestRateIndex, DC <: DayCount, B <: BusinessDayConvention, C <: BusinessCalendar, P <: PricingEngine} <: Bond
+type FloatingRateBond{I <: Integer, X <: InterestRateIndex, DC <: DayCount, P <: PricingEngine} <: Bond
   lazyMixin::LazyMixin
-  settlementDays::I
+  bondMixin::BondMixin{I}
   faceAmount::Float64
   schedule::Schedule
   cashflows::IborLeg
   iborIndex::X
   dc::DC
-  convention::B
-  calendar::C
   fixingDays::I
   gearings::Vector{Float64}
   spreads::Vector{Float64}
@@ -65,8 +63,6 @@ type FloatingRateBond{I <: Integer, X <: InterestRateIndex, DC <: DayCount, B <:
   floors::Vector{Float64}
   inArrears::Bool
   redemption::Float64
-  issueDate::Date
-  maturityDate::Date
   pricingEngine::P
   settlementValue::Float64
 end
@@ -79,20 +75,16 @@ function FloatingRateBond{I <: Integer, X <: InterestRateIndex, DC <: DayCount, 
   fixingDaysVect = fill(fixingDays, length(schedule.dates) - 1)
 
   coups = IborLeg(schedule, faceAmount, iborIndex, dc, convention, fixingDaysVect, gearings, spreads, caps, floors, inArrears; add_redemption=true)
-  return FloatingRateBond(LazyMixin(), settlementDays, faceAmount, schedule, coups, iborIndex, dc, convention, schedule.cal, fixingDays, gearings, spreads, caps, floors,
-                          inArrears, redemption, issueDate, maturityDate, pricingEngine, 0.0)
+  return FloatingRateBond{I, X, DC, P}(LazyMixin(), BondMixin{I}(settlementDays, issueDate, maturityDate), faceAmount, schedule, coups, iborIndex, dc, fixingDays, gearings, spreads, caps, floors,
+                          inArrears, redemption, pricingEngine, 0.0)
 end
 
-type ZeroCouponBond{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, P <: PricingEngine} <: Bond
+type ZeroCouponBond{I <: Integer, P <: PricingEngine} <: Bond
   lazyMixin::LazyMixin
-  settlementDays::I
-  calendar::B
+  bondMixin::BondMixin{I}
   faceAmount::Float64
-  maturityDate::Date
-  paymentConvention::C
   redemption::Float64
   cashflows::ZeroCouponLeg
-  issueDate::Date
   settlementValue::Float64
   pricingEngine::P
 end
@@ -101,13 +93,13 @@ function ZeroCouponBond{I <: Integer, B <: BusinessCalendar, C <: BusinessDayCon
                         redemption::Float64=100.0, issueDate::Date=Date(), pe::P = DiscountingBondEngine())
   # build redemption CashFlow
   redemption_cf = ZeroCouponLeg(SimpleCashFlow(redemption, maturityDate))
-  return ZeroCouponBond(LazyMixin(), settlementDays, calendar, faceAmount, maturityDate, paymentConvention, redemption, redemption_cf, issueDate, 0.0, pe)
+  return ZeroCouponBond{I, P}(LazyMixin(), BondMixin{I}(settlementDays, issueDate, maturityDate), faceAmount, redemption, redemption_cf, 0.0, pe)
 end
 
-get_settlement_date{B <: Bond}(b::B) = b.issueDate
+get_settlement_date{B <: Bond}(b::B) = get_issue_date(b)
 
 function notional{B <: Bond}(bond::B, d::Date)
-  if d > bond.maturityDate
+  if d > get_maturity_date(bond)
     return 0.0
   else
     return bond.faceAmount
@@ -165,5 +157,5 @@ function settlement_date{B <: Bond}(bond::B, d::Date = Date())
     d = settings.evaluation_date
   end
 
-  return d + Base.Dates.Day(bond.settlementDays)
+  return d + Base.Dates.Day(get_settlement_days(bond))
 end

@@ -21,7 +21,7 @@ end
 type ConstantSwaptionVolatility{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount} <: SwaptionVolatilityStructure
   settlementDays::I
   referenceDate::Date
-  cal::B
+  calendar::B
   bdc::C
   volatility::Quote
   dc::DC

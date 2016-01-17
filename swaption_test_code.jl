@@ -47,9 +47,21 @@ function main()
   fixedOTMRate = fixedATMRate * 1.2
   fixedITMRate = fixedATMRate * 0.8
 
-  sh = SwaptionHelper(swaptionMats[1], swaptionLengths[end], Quote(swaptionVols[1]), indexSixMonths, indexSixMonths.tenor, indexSixMonths.dc, indexSixMonths.dc, rhTermStructure)
+  times = zeros(0)
 
-  add_times_to!(sh)
+  for i = 1:numRows
+    j = numCols - (i - 1)
+    k = (i - 1) * numCols + j
 
-  return sh
+    sh = SwaptionHelper(swaptionMats[i], swaptionLengths[j], Quote(swaptionVols[k]), indexSixMonths, indexSixMonths.tenor, indexSixMonths.dc, indexSixMonths.dc, rhTermStructure)
+
+    times = add_times_to!(sh, times)
+  end
+
+  tg = QuantJulia.Time.TimeGrid(times, 30)
+
+  # models
+  modelG2 = G2(rhTermStructure)
+
+  return modelG2
 end

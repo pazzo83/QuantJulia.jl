@@ -35,7 +35,7 @@ export
 
     Exercise, EarlyExercise, CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap, BootstrapHelper, BondHelper, RateHelper,
     FittingMethod, CashFlows, CashFlow, Coupon, CouponPricer, IborCouponPricer, Instrument, Bond, Swap, SwapType, PricingEngine, Duration, AbstractRate, Results,
-    InterestRateIndex, AbstractCurrency, CalibrationHelper,
+    InterestRateIndex, AbstractCurrency, Parameter, CalibrationHelper, ShortRateModel,
 
     # lazy.jl
     LazyMixin, calculate!, recalculate!,
@@ -67,7 +67,7 @@ export
     BlackIborCouponPricer, IborCoupon, IborLeg, update_pricer!,
 
     # instruments/bond.jl
-    FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_date, notional, accrued_amount, yield, duration, npv, clean_price, dirty_price, accrued_amount,
+    BondMixin, FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_days, get_settlement_date, notional, accrued_amount, yield, duration, npv, clean_price, dirty_price, accrued_amount,
 
     # instruments/option.jl
     Put, Call,
@@ -108,8 +108,14 @@ export
     # pricing_engines/pricing_engines.jl
     DiscountingBondEngine, DiscountingSwapEngine, calculate,
 
+    # models/parameter.jl
+    ConstantParameter, G2FittingParameter, HullWhiteFittingParameter,
+
     # models/calibration_helpers.jl
-    SwaptionHelper, add_times_to!
+    SwaptionHelper, add_times_to!,
+
+    # models/short_rate.jl
+    G2, HulLWhite
 
 # abstract types
 include("abstract_types.jl")
@@ -166,7 +172,9 @@ include("termstructures/nonlinear_fitting_methods.jl")
 include("pricing_engines/pricing_engines.jl")
 
 # Models ---------------------------------
+include("models/parameter.jl")
 include("models/calibration_helpers.jl")
+include("models/short_rate.jl")
 
 # # Helpers NOW IN TERM STRUCTURE
 # include("helpers/bond_helpers.jl")

@@ -210,8 +210,9 @@ function value{C <: CostFunction, T}(cf::C, x::Vector{T})
   squared_error = 0.0
   n = length(cf.curve.bonds)
 
-  for (i, bh) in enumerate(cf.curve.bonds)
-    bond = bh.bond
+  # for (i, bh) in enumerate(cf.curve.bonds)
+  for i=1:length(cf.curve.bonds)
+    bond = cf.curve.bonds[i].bond
     bond_settlement = get_settlement_date(bond)
     model_price = -accrued_amount(bond, bond_settlement)
     leg = bond.cashflows

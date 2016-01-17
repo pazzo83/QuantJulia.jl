@@ -17,5 +17,5 @@ function settlement_date(bond::Bond, d::Date = Date())
     return settings.evaluation_date
   end
 
-  return d + bond.settlementDays
+  return d + get_settlement_days(bond)
 end

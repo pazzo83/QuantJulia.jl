@@ -84,6 +84,13 @@ get_latest_coupon{L <: Leg}(leg::L) = get_latest_coupon(leg, leg.coupons[end])
 get_latest_coupon{L <: Leg}(leg::L, simp::SimpleCashFlow) = leg.coupons[end - 1]
 get_latest_coupon{L <: Leg, C <: Coupon}(leg::L, coup::C) = coup
 
+check_coupon{C <: CashFlow}(x::C) = isa(x, Coupon)
+
+get_pay_dates{C <: Coupon}(coups::Vector{C}) = Date[date(coup) for coup in coups]
+
+get_reset_dates{C <: Coupon}(coups::Vector{C}) = Date[accrual_start_date(coup) for coup in coups]
+
+
 ## Pricer Methods ##
 # function initialize!(pricer::IborCouponPricer, coupon::IborCoupon)
 #   # stuff

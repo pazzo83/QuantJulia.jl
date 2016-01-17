@@ -40,6 +40,108 @@ end
 BlackSwaptionEngine{Y <: YieldTermStructure, DC <: DayCount}(yts::Y, vol::Quote, dc::DC, displacement::Float64 = 0.0) =
                     BlackSwaptionEngine(yts, vol, ConstantSwaptionVolatility(0, QuantJulia.Time.NullCalendar(), QuantJulia.Time.Following(), vol, dc), dc, displacement)
 
+type DiscretizedSwap <: DiscretizedAsset
+  fixedResetTimes::Vector{Float64}
+  fixedPayTimes::Vector{Float64}
+  floatingResetTimes::Vector{Float64}
+  floatingPayTimes::Vector{Float64}
+
+  function DiscretizedSwap{DC <: DayCount}(referenceDate::Date, dc::DC, fixedPayDates::Vector{Date}, fixedResetDates::Vector{Date}, floatingPayDates::Vector{Date}, floatingResetDates::Vector{Date})
+    fixed_n = length(fixedPayDates)
+    float_n = length(floatingPayDates)
+
+    fixedResetTimes = zeros(fixed_n)
+    fixedPayTimes = zeros(fixed_n)
+    floatingResetTimes = zeros(float_n)
+    floatingPayTimes = zeros(float_n)
+
+    for i = 1:fixed_n
+      fixedResetTimes[i] = year_fraction(dc, referenceDate, fixedResetDates[i])
+      fixedPayTimes[i] = year_fraction(dc, referenceDate, fixedPayDates[i])
+    end
+
+    for i = 1:float_n
+      floatingResetTimes[i] = year_fraction(dc, referenceDate, floatingResetDates[i])
+      floatingPayTimes[i] = year_fraction(dc, referenceDate, floatingPayDates[i])
+    end
+
+    new(fixedResetTimes, fixedPayTimes, floatingResetTimes, floatingPayTimes)
+  end
+end
+
+type DiscretizedSwaption{E <: Exercise} <: DiscretizedOption
+  underlying::DiscretizedSwap
+  exercise::E
+  exerciseTimes::Vector{Float64}
+  fixedPayDates::Vector{Date}
+  fixedResetDates::Vector{Date}
+  floatingPayDates::Vector{Date}
+  floatingResetDates::Vector{Date}
+  lastPayment::Float64
+end
+
+function DiscretizedSwaption{DC <: DayCount}(swaption::Swaption, referenceDate::Date, dc::DC)
+  dates = swaption.exercise.dates
+  fixed_coups = swaption.swap.legs[1].coupons
+  floating_coups = swaption.swap.legs[2].coupons
+  n = length(dates)
+
+  exerciseTimes = zeros(n)
+  fixedPayDates = get_pay_dates(fixed_coups)
+  fixedResetDates = get_reset_dates(fixed_coups)
+  floatingPayDates = get_pay_dates(floating_coups)
+  floatingResetDates = get_reset_dates(floating_coups)
+
+  for i = 1:n
+    exerciseTimes[i] = year_fraction(dc, referenceDate, dates[i])
+  end
+
+  # Date adjustments can get time vectors out of sync
+  # Here we try and collapse similar dates which could cause a mispricing
+  for i = 1:n
+    exerciseDate = dates[i]
+
+    for j = 1:length(fixed_coups)
+      if within_next_week(exerciseDate, fixedPayDates[j]) && fixedResetDates[j] < referenceDate
+        fixedPayDates[j] = exerciseDate
+      end
+
+      if within_previous_week(exerciseDate, fixedResetDates[j])
+        fixedResetDates[j] = exerciseDate
+      end
+    end
+
+    for j = 1:length(floating_coups)
+      if within_previous_week(exerciseDate, floatingResetDates[i])
+        floatingResetDates[j] = exerciseDate
+      end
+    end
+  end
+
+  lastFixedPayment = year_fraction(dc, referenceDate, fixedPayDates[end])
+  lastFloatingPayment = year_fraction(dc, referenceDate, floatingPayDates[end])
+
+  lastPayment = max(lastFixedPayment, lastFloatingPayment)
+  underlying = DiscretizedSwap(referenceDate, dc, fixedPayDates, fixedResetDates, floatingPayDates, floatingResetDates)
+  exercise = swaption.exercise
+
+  DiscretizedSwaption(underlying, exercise, exerciseTimes, fixedPayDates, fixedResetDates, floatingPayDates, floatingResetDates, lastPayment)
+end
+
+function mandatory_times(discretizedSwap::DiscretizedSwap)
+  # get times
+  times = vcat(discretizedSwap.fixedResetTimes[discretizedSwap.fixedResetTimes .>= 0.0], discretizedSwap.fixedPayTimes[discretizedSwap.fixedPayTimes .>= 0.0],
+               discretizedSwap.floatingResetTimes[discretizedSwap.floatingResetTimes .>= 0.0], discretizedSwap.floatingPayTimes[discretizedSwap.floatingPayTimes .>= 0.0])
+
+  return times
+end
+
+function mandatory_times(discretizedSwaption::DiscretizedSwaption)
+  times = mandatory_times(discretizedSwaption.underlying)
+  times =  times[times .>= 0.0]
+  times = vcat(times, discretizedSwaption.exerciseTimes)
+  return times
+end
 
 ## General Pricing Functions ##
 function black_formula{T <: OptionType}(optionType::T, strike::Float64, forward::Float64, stdDev::Float64, discount::Float64, displacement::Float64)
@@ -103,7 +205,9 @@ function _calculate!{S <: Swap}(pe::DiscountingSwapEngine, swap::S)
 
   swap.results.npvDateDiscount = discount(yts, ref_date)
 
-  for (i, leg) in enumerate(swap.legs)
+  # for (i, leg) in enumerate(swap.legs)
+  for i = 1:length(swap.legs)
+    leg = swap.legs[i]
     swap.results.legNPV[i], swap.results.legBPS[i] = npvbps(leg, yts, ref_date, ref_date)
     swap.results.legNPV[i] *= swap.payer[i]
     swap.results.legBPS[i] *= swap.payer[i]
@@ -130,7 +234,7 @@ end
 
 get_annuity(delivery::SettlementPhysical, swap::VanillaSwap) = abs(fixed_leg_BPS(swap)) / basisPoint
 
-function _calculate(pe::BlackSwaptionEngine, swaption::Swaption)
+function _calculate!(pe::BlackSwaptionEngine, swaption::Swaption)
   exerciseDate = swaption.exercise.dates[1]
   swap = swaption.swap
 
@@ -138,7 +242,7 @@ function _calculate(pe::BlackSwaptionEngine, swaption::Swaption)
 
   # override swap's pricing engine temporarily, bypassing normal calc flow, since swap.iborIndex might be using a diff curve
   _calculate!(DiscountingSwapEngine(pe.yts), swap)
-  swap.calculated = true
+  swap.lazyMixin.calculated = true
   atmForward = fair_rate(swap)
 
   if swap.spread != 0.0
@@ -153,7 +257,7 @@ function _calculate(pe::BlackSwaptionEngine, swaption::Swaption)
   swaption.results.additionalResults["strike"] = strike
   swaption.results.additionalResults["atmForward"] = atmForward
 
-  annuity = get_annuity(swaption.delivery, swaption)
+  annuity = get_annuity(swaption.delivery, swap)
   swaption.results.additionalResults["annuity"] = annuity
 
   # the swap length calculation might be improved using the value date of the exercise date
@@ -170,11 +274,11 @@ function _calculate(pe::BlackSwaptionEngine, swaption::Swaption)
 
   exerciseTime = time_from_reference(pe.volStructure, exerciseDate)
 
-  swaption.results.additionalResults["vega"] = sqrt(exerciseTime) * black_formula_standard_dev_derivative(strike, atmForward, stdDev, annuity, displacement)
+  swaption.results.additionalResults["vega"] = sqrt(exerciseTime) * black_formula_standard_dev_derivative(strike, atmForward, stdDev, annuity, pe.displacement)
 
   # resetting swap
   reset!(swap.results)
-  swap.calculated = false
+  swap.lazyMixin.calculated = false
 
   return swaption
 end

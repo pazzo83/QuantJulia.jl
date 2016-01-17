@@ -57,7 +57,9 @@ function Schedule{B <: BusinessDayConvention, C <: BusinessCalendar}(effectiveDa
     dt += tenor.period
   end
 
-  push!(dates, terminationDate)
+  if dates[end] != terminationDate
+    push!(dates, terminationDate)
+  end
 
   return Schedule{B, DateGenerationForwards, C}(effectiveDate, terminationDate, tenor, convention, termDateConvention, rule, endOfMonth, dates, cal)
 end

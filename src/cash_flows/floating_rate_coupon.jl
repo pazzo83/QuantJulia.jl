@@ -62,6 +62,9 @@ end
 # Coupon methods
 amount(coup::IborCoupon) = calc_rate(coup) * accrual_period(coup) * coup.nominal
 
+get_pay_dates(coups::Vector{Union{IborCoupon, SimpleCashFlow}}) = Date[date(coup) for coup in filter(check_coupon, coups)]
+get_reset_dates(coups::Vector{Union{IborCoupon, SimpleCashFlow}}) = Date[accrual_start_date(coup) for coup in filter(check_coupon, coups)]
+
 function calc_rate(coup::IborCoupon)
   QuantJulia.initialize!(coup.pricer, coup)
   # if coup.isInArrears

@@ -33,6 +33,8 @@ abstract RateHelper <: BootstrapHelper
 
 # Pricing Engines
 abstract PricingEngine{Y}
+abstract DiscretizedAsset
+abstract DiscretizedOption <: DiscretizedAsset
 
 # Cash Flows
 abstract CashFlows
@@ -46,7 +48,9 @@ abstract IborCouponPricer <: CouponPricer
 abstract InterestRateIndex
 
 # Models
-abstract CalibrationHelper
+abstract Parameter
+abstract CalibrationHelper <: LazyObject
+abstract ShortRateModel
 
 # Currencies
 abstract AbstractCurrency
