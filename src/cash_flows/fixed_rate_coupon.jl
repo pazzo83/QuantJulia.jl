@@ -53,6 +53,9 @@ type FixedRateLeg <: Leg
 end
 
 # Coupon methods
+get_pay_dates(coups::Vector{Union{FixedRateCoupon, SimpleCashFlow}}) = Date[date(coup) for coup in filter(check_coupon, coups)]
+get_reset_dates(coups::Vector{Union{FixedRateCoupon, SimpleCashFlow}}) = Date[accrual_start_date(coup) for coup in filter(check_coupon, coups)]
+
 function accrued_amount(coup::FixedRateCoupon, settlement_date::Date)
   if settlement_date <= accrual_start_date(coup) || settlement_date > coup.paymentDate
     return 0.0
