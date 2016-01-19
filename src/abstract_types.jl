@@ -49,6 +49,7 @@ abstract InterestRateIndex
 
 # Models
 abstract Parameter
+abstract CalibrationErrorType
 abstract CalibrationHelper <: LazyObject
 abstract ShortRateModel
 

@@ -71,6 +71,10 @@ const EPS_VAL = eps()
 export distribution_derivative
 include("distributions.jl")
 
+# integral.jl
+export Integrator, SegmentIntegral, operator, integrate
+include("integral.jl")
+
 # interpolation.jl
 export Interpolation, LogInterpolation, update!, locate, initialize!, value
 
@@ -82,7 +86,8 @@ export Solver1D, BrentSolver, NewtonSolver, FiniteDifferenceNewtonSafe, solve
 include("solvers.jl")
 
 # optimization.jl
-export CostFunction, Constraint, NoConstraint, PositiveConstraint, BoundaryConstraint, OptimizationMethod, Simplex, Problem, EndCriteria, minimize!, minimize_2!
+export Projection, CostFunction, Constraint, NoConstraint, PositiveConstraint, BoundaryConstraint, ProjectedConstraint, OptimizationMethod, LevenbergMarquardt, Simplex, Problem, EndCriteria,
+project, minimize!, minimize_2!
 
 include("optimization.jl")
 

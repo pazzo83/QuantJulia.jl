@@ -1,12 +1,20 @@
 using QuantJulia.Time
 
+type RelativePriceError <: CalibrationErrorType end
+type PriceError <: CalibrationErrorType end
+type ImpliedVolError <: CalibrationErrorType end
+
 type CalibrationHelperCommon
   marketValue::Float64
+  calibrationErrorType::CalibrationErrorType
 
-  CalibrationHelperCommon() = new(0.0)
+  CalibrationHelperCommon() = new(0.0, RelativePriceError())
 end
 
-type SwaptionHelper{Dm <: Dates.Period, Dl <: Dates.Period, DC_fix <: DayCount, DC_float <: DayCount, T <: YieldTermStructure} <: CalibrationHelper
+calibration_error{C <: CalibrationHelper}(::RelativePriceError, helper::C) =
+  abs(helper.calibCommon.marketValue - model_value!(helper)) / helper.calibCommon.marketValue
+
+type SwaptionHelper{Dm <: Dates.Period, Dl <: Dates.Period, DC_fix <: DayCount, DC_float <: DayCount, T <: YieldTermStructure, P <: PricingEngine} <: CalibrationHelper
   lazyMixin::LazyMixin
   exerciseDate::Date
   endDate::Date
@@ -24,15 +32,16 @@ type SwaptionHelper{Dm <: Dates.Period, Dl <: Dates.Period, DC_fix <: DayCount, 
   calibCommon::CalibrationHelperCommon
   yts::T
   swaption::Swaption
+  pricingEngine::P
 
-  SwaptionHelper(exerciseDate::Date, endDate::Date, maturity::Dm, swapLength::Dl, volatility::Quote, iborIndex::IborIndex, fixedLegTenor::TenorPeriod, fixedLegDayCount::DC_fix,
+  call{Dm, Dl, DC_fix, DC_float, T}(::Type{SwaptionHelper}, exerciseDate::Date, endDate::Date, maturity::Dm, swapLength::Dl, volatility::Quote, iborIndex::IborIndex, fixedLegTenor::TenorPeriod, fixedLegDayCount::DC_fix,
                 floatingLegDayCount::DC_float, strike::Float64, nominal::Float64, shift::Float64, exerciseRate::Float64, yts::T) =
-                new(LazyMixin(), exerciseDate, endDate, maturity, swapLength, volatility, iborIndex, fixedLegTenor, fixedLegDayCount, floatingLegDayCount, strike, nominal, shift, exerciseRate, CalibrationHelperCommon(), yts)
+                new{Dm, Dl, DC_fix, DC_float, T, PricingEngine}(LazyMixin(), exerciseDate, endDate, maturity, swapLength, volatility, iborIndex, fixedLegTenor, fixedLegDayCount, floatingLegDayCount, strike, nominal, shift, exerciseRate, CalibrationHelperCommon(), yts)
 end
 
 SwaptionHelper{Dm <: Dates.Period, Dl <: Dates.Period, DC_fix <: DayCount, DC_float <: DayCount, T <: YieldTermStructure}(maturity::Dm, swapLength::Dl, volatility::Quote, iborIndex::IborIndex, fixedLegTenor::TenorPeriod,
               fixedLegDayCount::DC_fix, floatingLegDayCount::DC_float, yts::T, strike::Float64 = -1.0, nominal::Float64 = 1.0, shift::Float64 = 0.0, exerciseRate::Float64 = 0.0) =
-              SwaptionHelper{Dm, Dl, DC_fix, DC_float, T}(Date(), Date(), maturity, swapLength, volatility, iborIndex, fixedLegTenor, fixedLegDayCount, floatingLegDayCount, strike, nominal, shift, exerciseRate, yts)
+              SwaptionHelper(Date(), Date(), maturity, swapLength, volatility, iborIndex, fixedLegTenor, fixedLegDayCount, floatingLegDayCount, strike, nominal, shift, exerciseRate, yts)
 
 function perform_calculations!(swaptionHelper::SwaptionHelper)
   calendar = swaptionHelper.iborIndex.fixingCalendar
@@ -85,6 +94,12 @@ function add_times_to!(swaptionHelper::SwaptionHelper, times::Vector{Float64})
   discretizedSwap = DiscretizedSwaption(swaptionHelper.swaption, reference_date(swaptionHelper.yts), swaptionHelper.yts.dc)
   times = vcat(times, mandatory_times(discretizedSwap))
   return times
+end
+
+function model_value!(sh::SwaptionHelper)
+  calculate!(sh)
+  update_pricing_engine!(sh.swaption, sh.pricingEngine)
+  return npv(sh.swaption)
 end
 
 function black_price!(swaptionHelper::SwaptionHelper, sigma::Float64)

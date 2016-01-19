@@ -66,6 +66,9 @@ export
     # cash_flows/floating_rate_coupon.jl
     BlackIborCouponPricer, IborCoupon, IborLeg, update_pricer!,
 
+    # instruments/Instruments.jl
+    update_pricing_engine!,
+
     # instruments/bond.jl
     BondMixin, FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_days, get_settlement_date, notional, accrued_amount, yield, duration, npv, clean_price, dirty_price, accrued_amount,
 
@@ -105,9 +108,6 @@ export
     # termstructures/nonlinear_fitting_methods.jl
     ExponentialSplinesFitting, SimplePolynomialFitting, NelsonSiegelFitting, SvenssonFitting, CubicBSplinesFitting, discount_function, guess_size,
 
-    # pricing_engines/pricing_engines.jl
-    DiscountingBondEngine, DiscountingSwapEngine, calculate,
-
     # models/parameter.jl
     ConstantParameter, G2FittingParameter, HullWhiteFittingParameter,
 
@@ -115,7 +115,10 @@ export
     SwaptionHelper, add_times_to!,
 
     # models/short_rate.jl
-    G2, HulLWhite
+    G2, HulLWhite, calibrate!, 
+
+    # pricing_engines/pricing_engines.jl
+    DiscountingBondEngine, DiscountingSwapEngine, G2SwaptionEngine, calculate
 
 # abstract types
 include("abstract_types.jl")
@@ -144,6 +147,7 @@ include("cash_flows/fixed_rate_coupon.jl")
 include("cash_flows/floating_rate_coupon.jl")
 
 # Instruments ------------------------
+include("instruments/Instruments.jl")
 # bond
 include("instruments/bond.jl")
 include("instruments/option.jl")
@@ -168,13 +172,13 @@ include("termstructures/bootstrap.jl")
 # nonlinear fitting methods
 include("termstructures/nonlinear_fitting_methods.jl")
 
-# Pricing Engines ------------------------
-include("pricing_engines/pricing_engines.jl")
-
 # Models ---------------------------------
 include("models/parameter.jl")
 include("models/calibration_helpers.jl")
 include("models/short_rate.jl")
+
+# Pricing Engines ------------------------
+include("pricing_engines/pricing_engines.jl")
 
 # # Helpers NOW IN TERM STRUCTURE
 # include("helpers/bond_helpers.jl")

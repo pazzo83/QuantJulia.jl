@@ -22,6 +22,19 @@ type SwapResults <: Results
   end
 end
 
+type VanillaSwapArgs
+  fixedResetDates::Vector{Date}
+  fixedPayDates::Vector{Date}
+  floatingResetDates::Vector{Date}
+  floatingPayDates::Vector{Date}
+end
+
+function VanillaSwapArgs{L <: Leg}(legs::Vector{L})
+  fixedCoups = legs[1].coupons
+  floatingCoups = legs[2].coupons
+  return VanillaSwapArgs(get_reset_dates(fixedCoups), get_pay_dates(fixedCoups), get_reset_dates(floatingCoups), get_pay_dates(floatingCoups))
+end
+
 function reset!(sr::SwapResults)
   n = length(sr.legNPV)
   sr.legNPV = zeros(n)
@@ -51,6 +64,7 @@ type VanillaSwap{ST <: SwapType, DC_fix <: DayCount, DC_float <: DayCount, B <: 
   payer::Vector{Float64}
   pricingEngine::P
   results::SwapResults
+  args::VanillaSwapArgs
 end
 
 # Constructors
@@ -67,7 +81,8 @@ function VanillaSwap{ST <: SwapType, DC_fix <: DayCount, DC_float <: DayCount, B
 
   results = SwapResults(2)
 
-  return VanillaSwap{ST, DC_fix, DC_float, B, Leg, P}(LazyMixin(), swapT, nominal, fixedSchedule, fixedRate, fixedDayCount, iborIndex, spread, floatSchedule, floatDayCount, paymentConvention, legs, payer, pricingEngine, results)
+  return VanillaSwap{ST, DC_fix, DC_float, B, Leg, P}(LazyMixin(), swapT, nominal, fixedSchedule, fixedRate, fixedDayCount, iborIndex, spread, floatSchedule, floatDayCount,
+                    paymentConvention, legs, payer, pricingEngine, results, VanillaSwapArgs(legs))
 end
 
 # Swap Helper methods

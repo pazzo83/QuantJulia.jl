@@ -40,6 +40,12 @@ end
 BlackSwaptionEngine{Y <: YieldTermStructure, DC <: DayCount}(yts::Y, vol::Quote, dc::DC, displacement::Float64 = 0.0) =
                     BlackSwaptionEngine(yts, vol, ConstantSwaptionVolatility(0, QuantJulia.Time.NullCalendar(), QuantJulia.Time.Following(), vol, dc), dc, displacement)
 
+type G2SwaptionEngine{Y <: YieldTermStructure, I <: Integer} <: PricingEngine{Y}
+  model::G2{Y}
+  range::Float64
+  intervals::I
+end
+
 type DiscretizedSwap <: DiscretizedAsset
   fixedResetTimes::Vector{Float64}
   fixedPayTimes::Vector{Float64}
@@ -87,10 +93,14 @@ function DiscretizedSwaption{DC <: DayCount}(swaption::Swaption, referenceDate::
   n = length(dates)
 
   exerciseTimes = zeros(n)
-  fixedPayDates = get_pay_dates(fixed_coups)
-  fixedResetDates = get_reset_dates(fixed_coups)
-  floatingPayDates = get_pay_dates(floating_coups)
-  floatingResetDates = get_reset_dates(floating_coups)
+  # fixedPayDates = get_pay_dates(fixed_coups)
+  # fixedResetDates = get_reset_dates(fixed_coups)
+  # floatingPayDates = get_pay_dates(floating_coups)
+  # floatingResetDates = get_reset_dates(floating_coups)
+  fixedPayDates = swaption.swap.args.fixedPayDates
+  fixedResetDates = swaption.swap.args.fixedResetDates
+  floatingPayDates = swaption.swap.args.floatingPayDates
+  floatingResetDates = swaption.swap.args.floatingResetDates
 
   for i = 1:n
     exerciseTimes[i] = year_fraction(dc, referenceDate, dates[i])
@@ -279,6 +289,20 @@ function _calculate!(pe::BlackSwaptionEngine, swaption::Swaption)
   # resetting swap
   reset!(swap.results)
   swap.lazyMixin.calculated = false
+
+  return swaption
+end
+
+function _calculate!(pe::G2SwaptionEngine, swaption::Swaption)
+  swap = swaption.swap
+
+  # overriding pricing engine
+  _calculate!(DiscountingSwapEngine(pe.model.ts), swap)
+  swap.lazyMixin.calculated = true
+
+  correction = swap.spread * abs(floating_leg_BPS(swap) / fixed_leg_BPS(swap))
+  fixedRate = swap.fixedRate - correction
+  swaption.results.value = gen_swaption(pe.model, swaption, fixedRate, pe.range, pe.intervals)
 
   return swaption
 end

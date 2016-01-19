@@ -1,7 +1,7 @@
 # cash_flows.jl
 # module CF
 
-using QuantJulia.Time
+using QuantJulia.Time, QuantJulia.Math
 
 # BlackIborCouponPricer() = BlackIborCouponPricer(0.0, 0.0, false)
 
@@ -481,7 +481,7 @@ function yield{L <: Leg, DC <: DayCount, C <: CompoundingType, F <: Frequency, I
   solver = NewtonSolver(max_iter)
   obj_fun = IRRFinder(leg, npv, dc, compounding, freq, include_settlement_cf, settlement_date, npv_date)
 
-  return solve(solver, operator(obj_fun), accuracy, guess, guess / 10.0)
+  return solve(solver, QuantJulia.operator(obj_fun), accuracy, guess, guess / 10.0)
 end
 
 ## ITERATORS ##

@@ -1,5 +1,39 @@
 using QuantJulia
 
+const FINITE_DIFFERENCES_EPSILON = 1e-8
+
+type Projection{I <: Integer}
+  parameterValues::Vector{Float64}
+  fixParams::BitArray
+  numberOfFreeParams::I
+end
+
+function Projection(parameterValues::Vector{Float64}, fixParams::BitArray)
+  # get num of free params
+  numFree = 0
+  for i in fixParams
+    if !i
+      numFree += 1
+    end
+  end
+
+  return Projection(parameterValues, fixParams, numFree)
+end
+
+function project(proj::Projection, params::Vector{Float64})
+  projectedParams = Vector{Float64}(proj.numberOfFreeParams)
+
+  i = 1
+  for j = 1:length(proj.fixParams)
+    if !proj.fixParams[j]
+      projectedParams[i] = params[j]
+      i += 1
+    end
+  end
+
+  return projectedParams
+end
+
 abstract CostFunction
 
 abstract Constraint
@@ -11,11 +45,25 @@ type BoundaryConstraint <: Constraint
   high::Float64
 end
 
+type ProjectedConstraint{C <: Constraint} <: Constraint
+  constraint::C
+  projection::Projection
+end
+
 abstract OptimizationMethod
 
 type Simplex <: OptimizationMethod
   lambda::Float64
 end
+
+type LevenbergMarquardt <: OptimizationMethod
+  epsfcn::Float64
+  xtol::Float64
+  gtol::Float64
+  useCostFunctionsJacobin::Bool
+end
+
+LevenbergMarquardt() = LevenbergMarquardt(1.0e-8, 1.0e-8, 1.0e-8, false)
 
 type Problem{F <: CostFunction, C <: Constraint, T, I <: Integer}
   costFunction::F
@@ -66,6 +114,68 @@ function update{C <: Constraint, T}(constraint::C, params::Vector{T}, direction:
 
   params += diff * direction
   return params
+end
+
+## Cost Function methods ##
+function get_jacobin!{C <: CostFunction}(cf::C, jac::Matrix{Float64}, x::Vector{Float64})
+  eps_ = FINITE_DIFFERENCES_EPSILON
+  xx = zeros(length(x))
+  for i = 1:length(x)
+    xx[i] += eps_
+    fp = QuantJulia.func_values(cf, xx)
+    xx[i] -= 2.0 * eps_
+    fm = QuantJulia.func_values(cf, xx)
+    for j = 1:length(fp)
+      jac[j,i] = 0.5 * (fp[j] - fm[j]) / eps_
+    end
+
+    xx[i] = x[i]
+  end
+  return jac
+end
+
+
+
+## Levenberg Marquardt Methods ##
+function minimize!(lm::LevenbergMarquardt, p::Problem, endCriteria::EndCriteria)
+  reset!(p)
+  x = p.currentValue
+  initCostValues = QuantJulia.func_values(p.costFunction, x)
+
+  m = length(initCostValues)
+  n = length(x)
+  if lm.useCostFunctionsJacobin
+    initJacobin = zeros(m, n)
+    get_jacobin!(p.costFunction, initJacobin, x)
+  end
+  xx = copy(x)
+  fvec = zeros(m)
+  diag = zeros(n)
+  mode = 1
+  factor = 1
+  nprint = 0
+  info = 0
+  nfev = 0
+  fjac = zeros(m * n)
+  ldfjac = m
+  ipvt = ones(n)
+  qtf = zeros(n)
+  wa1 = zeros(n)
+  wa2 = zeros(n)
+  wa3 = zeros(n)
+  wa4 = zeros(n)
+  
+  function fcn{I <: Integer}(::I, n::I, x::Float64, fvec::Float64, ::I)
+    xt = fill(x + n, n)
+  end
+
+  function jacFcn{I <: Integer}(m::I, n::I, x::Float64, fjac::Float64, ::I)
+    xt = fill(x + n, n)
+  end
+
+  # TODO check requirements, see levenbergmarquardt.cpp
+
+
 end
 
 ## SIMPLEX METHODS ##

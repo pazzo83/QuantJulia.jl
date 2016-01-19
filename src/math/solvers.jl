@@ -160,7 +160,7 @@ function _solve{I <: Integer}(solver::BrentSolver, f::Function, accuracy::Float6
     xAcc1 = 2.0 * eps(Float64) * abs(root) + 0.5 * accuracy
     xMid = (xMax - root) / 2.0
     if abs(xMid) <= xAcc1 || is_close(froot, 0.0)
-      root = f(root)
+      _ = f(root)
       eval_num += 1
       return root
     end

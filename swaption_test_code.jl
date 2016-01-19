@@ -9,6 +9,12 @@ function generate_flatforward_ts{C <: QuantJulia.Time.BusinessCalendar}(cal::C, 
   return ffts
 end
 
+function calibrate_model{M <: ShortRateModel}(model::M, helpers::Vector{SwaptionHelper})
+  om = QuantJulia.Math.LevenbergMarquardt()
+  calibrate!(model, helpers, om, QuantJulia.Math.EndCriteria(400, 100, 1.0e-8, 1.0e-8, 1.0e-8))
+end
+
+
 function main()
   cal = QuantJulia.Time.TargetCalendar()
   settlementDate = Date(2002, 2, 19)
@@ -48,6 +54,7 @@ function main()
   fixedITMRate = fixedATMRate * 0.8
 
   times = zeros(0)
+  swaptions = Vector{SwaptionHelper}(numRows)
 
   for i = 1:numRows
     j = numCols - (i - 1)
@@ -56,6 +63,7 @@ function main()
     sh = SwaptionHelper(swaptionMats[i], swaptionLengths[j], Quote(swaptionVols[k]), indexSixMonths, indexSixMonths.tenor, indexSixMonths.dc, indexSixMonths.dc, rhTermStructure)
 
     times = add_times_to!(sh, times)
+    swaptions[i] = sh
   end
 
   tg = QuantJulia.Time.TimeGrid(times, 30)
@@ -63,5 +71,9 @@ function main()
   # models
   modelG2 = G2(rhTermStructure)
 
-  return modelG2
+  for swaptionHelper in swaptions
+    swaptionHelper.pricingEngine = G2SwaptionEngine(modelG2, 6.0, 16)
+  end
+
+  calibrate_model(modelG2, swaptions)
 end
