@@ -3,7 +3,8 @@ using QuantJulia
 const FINITE_DIFFERENCES_EPSILON = 1e-8
 
 type Projection{I <: Integer}
-  parameterValues::Vector{Float64}
+  actualParameters::Vector{Float64}
+  fixedParameters::Vector{Float64}
   fixParams::BitArray
   numberOfFreeParams::I
 end
@@ -17,7 +18,7 @@ function Projection(parameterValues::Vector{Float64}, fixParams::BitArray)
     end
   end
 
-  return Projection(parameterValues, fixParams, numFree)
+  return Projection(parameterValues, parameterValues, fixParams, numFree)
 end
 
 function project(proj::Projection, params::Vector{Float64})
@@ -32,6 +33,20 @@ function project(proj::Projection, params::Vector{Float64})
   end
 
   return projectedParams
+end
+
+function include_params(proj::Projection, params::Vector{Float64})
+  y = copy(proj.fixedParameters)
+
+  i = 1
+  for j = 1:length(y)
+    if !proj.fixParams[j]
+      y[j] = params[i]
+      i += 1
+    end
+  end
+
+  return y
 end
 
 abstract CostFunction
@@ -96,6 +111,28 @@ end
 
 test{T}(::NoConstraint, ::Vector{T}) = true
 
+test(c::ProjectedConstraint, x::Vector{Float64}) = test(c.constraint, include_params(c.projection, x))
+
+function test(::PositiveConstraint, x::Vector{Float64})
+  for i = 1:length(x)
+    if x[i] <= 0.0
+      return false
+    end
+  end
+
+  return true
+end
+
+function test(c::BoundaryConstraint, x::Vector{Float64})
+  for i = 1:length(x)
+    if x[i] < c.low || x[i] > c.high
+      return false
+    end
+  end
+
+  return true
+end
+
 function update{C <: Constraint, T}(constraint::C, params::Vector{T}, direction::Vector{Float64}, beta::Float64)
   diff = beta
   new_params = params + diff * direction
@@ -140,7 +177,7 @@ end
 function minimize!(lm::LevenbergMarquardt, p::Problem, endCriteria::EndCriteria)
   reset!(p)
   x = p.currentValue
-  initCostValues = QuantJulia.func_values(p.costFunction, x)
+  initCostValues = values!(p, x)
 
   m = length(initCostValues)
   n = length(x)
@@ -150,30 +187,41 @@ function minimize!(lm::LevenbergMarquardt, p::Problem, endCriteria::EndCriteria)
   end
   xx = copy(x)
   fvec = zeros(m)
-  diag = zeros(n)
+  diag_ = zeros(n)
   mode = 1
-  factor = 1
+  factor_ = 1.0
   nprint = 0
-  info = 0
+  info_ = 0
   nfev = 0
-  fjac = zeros(m * n)
+  fjac = zeros(m, n)
   ldfjac = m
-  ipvt = ones(n)
+  ipvt = ones(Int, n)
   qtf = zeros(n)
   wa1 = zeros(n)
   wa2 = zeros(n)
   wa3 = zeros(n)
   wa4 = zeros(n)
-  
-  function fcn{I <: Integer}(::I, n::I, x::Float64, fvec::Float64, ::I)
-    xt = fill(x + n, n)
+
+  function fcn!{I <: Integer}(::I, n::I, x::Vector{Float64}, fvec::Vector{Float64}, ::I)
+    xt = x[1:n]
+
+    if test(p.constraint, xt)
+      tmp = values!(p, xt)
+      fvec[1:n] = tmp
+    else
+      fvec = copy(initCostValues)
+    end
+
+    return fvec
   end
 
-  function jacFcn{I <: Integer}(m::I, n::I, x::Float64, fjac::Float64, ::I)
+  function jacFcn!{I <: Integer}(m::I, n::I, x::Float64, fjac::Float64, ::I)
     xt = fill(x + n, n)
   end
 
   # TODO check requirements, see levenbergmarquardt.cpp
+  lmdif!(m, n, xx, fvec, endCriteria.functionEpsilon, lm.xtol, lm.gtol, endCriteria.maxIterations, lm.epsfcn, diag_, mode, factor_, nprint, info_, nfev, fjac, ldfjac,
+        ipvt, qtf, wa1, wa2, wa3, wa4, fcn!, jacFcn!, false)
 
 
 end
@@ -467,6 +515,11 @@ end
 function value!{T}(p::Problem, x::Vector{T})
   p.functionEvaluation += 1
   return QuantJulia.value(p.costFunction, x)
+end
+
+function values!(p::Problem, x::Vector{Float64})
+  p.functionEvaluation += 1
+  return QuantJulia.func_values(p.costFunction, x)
 end
 
 function extrapolate!{I <: Integer, T}(p::Problem, i_highest::I, factor::Float64, values::Vector{T}, sum_array::Vector{T},

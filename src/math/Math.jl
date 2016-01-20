@@ -67,6 +67,10 @@ export BSpline, spline_oper, N
 # Constants
 const EPS_VAL = eps()
 
+# lmdif.jl
+export lmdif!
+include("lmdif.jl")
+
 # distribution.jl
 export distribution_derivative
 include("distributions.jl")

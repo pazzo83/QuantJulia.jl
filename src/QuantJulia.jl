@@ -115,7 +115,7 @@ export
     SwaptionHelper, add_times_to!,
 
     # models/short_rate.jl
-    G2, HulLWhite, calibrate!, 
+    PrivateConstraint, G2, HulLWhite, test, calibrate!, 
 
     # pricing_engines/pricing_engines.jl
     DiscountingBondEngine, DiscountingSwapEngine, G2SwaptionEngine, calculate

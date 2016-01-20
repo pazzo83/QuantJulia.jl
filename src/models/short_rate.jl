@@ -5,6 +5,23 @@ type PrivateConstraint{P <: Parameter} <: Constraint
   arguments::Vector{P}
 end
 
+function QuantJulia.Math.test(c::PrivateConstraint, x::Vector{Float64})
+  k = 1
+  for i = 1:length(c.arguments)
+    sz = length(c.arguments[i].data)
+    testParams = zeros(sz)
+    for j = 1:sz
+      testParams[j] = x[k]
+      k += 1
+    end
+    if !test_params(c.arguments[i], testParams)
+      return false
+    end
+  end
+
+  return true
+end
+
 type CalibrationFunction{M <: ShortRateModel, C <: CalibrationHelper} <: CostFunction
   model::M
   helpers::Vector{C}

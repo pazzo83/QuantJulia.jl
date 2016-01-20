@@ -66,7 +66,7 @@ function enorm{I <: Integer}(n::I, x::Vector{Float64})
 end
 
 # Forward Difference Approximation #
-function fdjac2!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fjac::Matrix{Float64}, ::I, iflag::I, epsfcn::Float64, wa::Vector{Float64}, fcn::Function)
+function fdjac2!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float64}, fjac::Matrix{Float64}, ::I, iflag::I, epsfcn::Float64, wa::Vector{Float64}, fcn!::Function)
   # returns:
   # fjac :  is an output m by n array which contains the
   #         approximation to the jacobian matrix evaluated at x.
@@ -78,16 +78,17 @@ function fdjac2!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fjac::Matrix{Floa
     h = eps_ * abs(temp)
     if h == 0.0
       h = eps_
-      x[j] = temp + h
-      fcn(m, n, x, wa, iflag)
-      if iflag < 0
-        return fjac
-      end
-      x[j] = temp
-      for i = 1:m
-        fjac[ij] = (wa[i] - fvec[i]) / h
-        ij += 1
-      end
+    end
+
+    x[j] = temp + h
+    fcn!(m, n, x, wa, iflag)
+    if iflag < 0
+      return fjac
+    end
+    x[j] = temp
+    for i = 1:m
+      fjac[ij] = (wa[i] - fvec[i]) / h
+      ij += 1
     end
   end
 
@@ -183,7 +184,7 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
     # Apply the transformation to the remaining columns
     # and update the norms
     jp1 = j + 1
-    if jp1 < n
+    if jp1 <= n
       for k = jp1:n
         sum_ = 0.0
         ij = j + m * (k - 1)
@@ -205,7 +206,7 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
         end
 
         if pivot != 0 && rdiag[k] != 0.0
-          temp = a[j + m * (j - 1)]  / rdiag[k]
+          temp = a[j + m * (k - 1)]  / rdiag[k]
           temp = max(0.0, 1.0 - temp * temp)
           rdiag[k] *= sqrt(temp)
           temp = rdiag[k]/wa[k]
@@ -226,7 +227,7 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
   return a, ipvt, rdiag, acnorm
 end
 
-function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{I}, diag::Vector{Float64}, qtb::Vector{Float64}, x::Vector{Float64},
+function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{I}, diag_::Vector{Float64}, qtb::Vector{Float64}, x::Vector{Float64},
                 sdiag::Vector{Float64}, wa::Vector{Float64})
   # copy r and (q transpose) * b to preserve input and initialize s, in particular
   # save the diagonal elements of r in x
@@ -247,13 +248,13 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
   # eliminate the diagonal matrix d using a given rotation
   for j = 1:n
     l = ipvt[j]
-    if diag[j] == 0.0
+    if diag_[j] == 0.0
       @goto L90
     end
     for k = j:n
       sdiag[k] = 0.0
     end
-    sdiag[j] = diag[l]
+    sdiag[j] = diag_[l]
 
     # transformations to eliminate the row of d, modify only a single element
     # of (q transpose) * b beyond the first n, which is initially zero
@@ -299,7 +300,7 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
 
     # store the diagonal element of s and restore the corresponding diagonal
     # element of r
-    kk = j + ldr * j
+    kk = j + ldr * (j - 1)
     sdiag[j] = r[kk]
     r[kk] = x[j]
   end
@@ -345,7 +346,7 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
   return r, x, sdiag
 end
 
-function lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, diag::Vector{Float64}, qtb::Vector{Float64}, delta::Float64, par::Vector{Float64},
+function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, diag_::Vector{Float64}, qtb::Vector{Float64}, delta::Float64, par::Float64,
               x::Vector{Float64}, sdiag::Vector{Float64}, wa1::Vector{Float64}, wa2::Vector{Float64})
 
   # Compute and store in x the gauss-newton direction.  If the jacobin is rank-deficient
@@ -371,7 +372,7 @@ function lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, 
       wa1[j] = wa1[j] / r[j + ldr * (j - 1)]
       temp = wa1[j]
       jm1 = j - 1
-      if jm1 > = 1
+      if jm1 >= 1
         ij = ldr * (j - 1) + 1
         for i = 1:jm1 + 1
           wa1[i] -= r[ij] * temp
@@ -390,7 +391,7 @@ function lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, 
   # and test for acceptance of the gauss-newton direction
   iter = 0
   for j = 1:n
-    wa2[j] = diag[j] * x[j]
+    wa2[j] = diag_[j] * x[j]
   end
 
   dxnorm = enorm(n, wa2)
@@ -404,7 +405,7 @@ function lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, 
   if nsing >= n
     for j = 1:n
       l = ipvt[j]
-      wa1[l] = diag[l] * (wa2[l] / dxnorm)
+      wa1[l] = diag_[l] * (wa2[l] / dxnorm)
     end
     jj = 1
     for j = 1:n
@@ -412,7 +413,7 @@ function lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, 
       jm1 = j - 1
       if jm1 >= 1
         ij = jj
-        for i = 1:jm1 + 1
+        for i = 1:jm1
           sum_ += r[ij] * wa1[i]
           ij += 1
         end
@@ -428,12 +429,12 @@ function lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, 
   for j = 1:n
     sum_ = 0.0
     ij = jj
-    for i = 1:j + 1
+    for i = 1:j
       sum_ += r[ij] * qtb[i]
       ij += 1
     end
     l = ipvt[j]
-    wa1[j] = sum_ / diag[l]
+    wa1[j] = sum_ / diag_[l]
     jj += ldr
   end
 
@@ -462,13 +463,13 @@ function lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, 
 
   temp = sqrt(par)
   for j = 1:n
-    wa1[j] = temp * diag[j]
+    wa1[j] = temp * diag_[j]
   end
 
   qrsolv!(n, r, ldr, ipvt, wa1, qtb, x, sdiag, wa2)
 
   for j = 1:n
-    wa2[j] = diag[j] * x[j]
+    wa2[j] = diag_[j] * x[j]
   end
 
   dxnorm = enorm(n, wa2)
@@ -483,7 +484,7 @@ function lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, 
   # compute the newton correction
   for j = 1:n
     l = ipvt[j]
-    wa1[l] = diag[l] * (wa2[l] / dxnorm)
+    wa1[l] = diag_[l] * (wa2[l] / dxnorm)
   end
 
   jj = 1
@@ -529,21 +530,21 @@ function lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I}, 
 end
 
 function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float64}, ftol::Float64, xtol::Float64, gtol::Float64, maxFev::I, epsfcn::Float64,
-                diag::Vector{Float64}, mode::I, factor::Float64, nprint::I, info::I, nfev::I, fjac::Matrix{Float64}, ldfjac::I, ipvt::Vector{I}, qtf::Vector{Float64},
-                wa1::Vector{Float64}, wa2::Vector{Float64}, wa3::Vector{Float64}, wa4::Vector{Float64}, fcn::Function, jacFcn::Function, useJac::Bool = true)
+                diag_::Vector{Float64}, mode::I, factor_::Float64, nprint::I, info_::I, nfev::I, fjac::Matrix{Float64}, ldfjac::I, ipvt::Vector{I}, qtf::Vector{Float64},
+                wa1::Vector{Float64}, wa2::Vector{Float64}, wa3::Vector{Float64}, wa4::Vector{Float64}, fcn!::Function, jacFcn!::Function, useJac::Bool = true)
 
   delta = 0
   xnorm = 0
-  info = 0
+  info_ = 0
   iflag = 0
   nfev = 0
 
   # checking for errors
-  (n <= 0 || m < n || ldfjac < m || ftol < 0.0 || xtol < 0.0 || gtol < 0.0 || maxFev <= 0 || factor <= 0.0) && @goto L300
+  (n <= 0 || m < n || ldfjac < m || ftol < 0.0 || xtol < 0.0 || gtol < 0.0 || maxFev <= 0 || factor_ <= 0.0) && @goto L300
 
   if mode == 2
     for j = 1:n
-      if diag[j] <= 0.0
+      if diag_[j] <= 0.0
         @goto L300
       end
     end
@@ -551,12 +552,12 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
 
   # Evaluate the function at its starting point and calculate its norm
   iflag = 1
-  fcn(m, n, x, fvec, iflag)
+  fcn!(m, n, x, fvec, iflag)
   nfev = 1
   if iflag < 0
     @goto L300
   end
-  fnrom = enorm(m, fvec)
+  fnorm = enorm(m, fvec)
 
   # Initialize the levenberg-marquardt param and iteration counter
   par = 0.0
@@ -566,9 +567,9 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   # Calcualte the Jacobian matrix
   iflag = 2
   if useJac
-    jacFcn(m, n, x, fjac, iflag)
+    jacFcn!(m, n, x, fjac, iflag)
   else
-    fdjac2!(m, n, x, fvec, fjac, ldfjac, iflag, epsfcn, wa4, fcn)
+    fdjac2!(m, n, x, fvec, fjac, ldfjac, iflag, epsfcn, wa4, fcn!)
   end
 
   nfev += n
@@ -581,7 +582,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   if nprint > 0
     iflag = 0
     if mod(iter - 1, nprint) == 0
-      fcn(m, n, x, fvec, iflag)
+      fcn!(m, n, x, fvec, iflag)
       if iflag < 0
         @goto L300
       end
@@ -589,16 +590,16 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   end
 
   # compute the QR factorization of the Jacobian
-  qrfac!(m, n, fjac, ldfjac, 1, ivpt, n, wa1, wa2, wa3)
+  qrfac!(m, n, fjac, ldfjac, 1, ipvt, n, wa1, wa2, wa3)
 
   # on the first iteration and if mode is 1, scale according to the norms
   # of the columns in the initial jacobin
   if iter == 1
     if mode != 2
       for j = 1:n
-        diag[j] = wa2[j]
+        diag_[j] = wa2[j]
         if wa2[j] == 0.0
-          diag[j] = 1.0
+          diag_[j] = 1.0
         end
       end
     end
@@ -606,13 +607,13 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     # on the first iteration, calculate the norm of the scaled x and initialize
     # the step bound delta
     for j = 1:n
-      wa3[j] = diag[j] * x[j]
+      wa3[j] = diag_[j] * x[j]
     end
 
     xnorm = enorm(n, wa3)
-    delta = factor * xnorm
+    delta = factor_ * xnorm
     if delta == 0.0
-      delta = factor
+      delta = factor_
     end
 
   end
@@ -649,11 +650,11 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   if fnorm != 0.0
     jj = 1
     for j = 1:n
-      l = ivpt[j]
+      l = ipvt[j]
       if wa2[l] != 0.0
         sum_ = 0.0
         ij = jj
-        for i = 1:j + 1
+        for i = 1:j
           sum_ += fjac[ij] * (qtf[i] / fnorm)
           ij += 1
         end
@@ -665,17 +666,17 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
 
   # test for convergence of the gradient norm
   if gnorm <= gtol
-    info = 4
+    info_ = 4
   end
 
-  if info != 0
+  if info_ != 0
     @goto L300
   end
 
   # rescale if necessary
   if mode != 2
     for j = 1:n
-      diag[j] = max(diag[j], wa2[j])
+      diag_[j] = max(diag_[j], wa2[j])
     end
   end
 
@@ -683,13 +684,13 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   @label L200
 
   # determine the levenberg-marquardt param
-  lmpar!(n, fjac, ldfjac, ipvt, diag, qtf, delta, par, wa1, wa2, wa3, wa4)
+  lmpar!(n, fjac, ldfjac, ipvt, diag_, qtf, delta, par, wa1, wa2, wa3, wa4)
 
   # store the direction of p and x + p, calculate the norm of p
   for j = 1:n
     wa1[j] = -wa1[j]
     wa2[j] = x[j] + wa1[j]
-    wa3[j] = diag[j] * wa1[j]
+    wa3[j] = diag_[j] * wa1[j]
   end
 
   pnorm = enorm(n, wa3)
@@ -700,7 +701,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   end
 
   iflag = 1
-  fcn(m, n, wa2, wa4, iflag)
+  fcn!(m, n, wa2, wa4, iflag)
   nfev += 1
 
   if iflag < 0
@@ -724,12 +725,12 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     l = ipvt[j]
     temp = wa1[l]
     ij = jj
-    for i = 1:j + 1
+    for i = 1:j
       wa3[i] += fjac[ij] * temp
       ij += 1
     end
 
-    jj += 1
+    jj += m
   end
 
   temp1 = enorm(n, wa3) / fnorm
@@ -767,7 +768,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   if ratio > 0.0001
     for j = 1:n
       x[j] = wa2[j]
-      wa2[j] = diag[j] * x[j]
+      wa2[j] = diag_[j] * x[j]
     end
     for i = 1:m
       fvec[i] = wa4[i]
@@ -780,37 +781,37 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
 
   # Tests for convergence
   if abs(actred) <= ftol && prered <= ftol && 0.5 * ratio <= 1.0
-    info = 1
+    info_ = 1
   end
 
   if delta <= xtol * xnorm
-    info = 2
+    info_ = 2
   end
 
-  if abs(actred) <= ftol && prered <= ftol && 0.5 * ratio <= 1.0 && info == 2
-    info = 3
+  if abs(actred) <= ftol && prered <= ftol && 0.5 * ratio <= 1.0 && info_ == 2
+    info_ = 3
   end
 
-  info != 0 && @goto L300
+  info_ != 0 && @goto L300
 
   # Tests for termination and stringent tolerances
   if nfev >= maxFev
-    info = 5
+    info_ = 5
   end
 
   if abs(actred) <= MACHEP && prered <= MACHEP && 0.5 * ratio <= 1.0
-    info = 6
+    info_ = 6
   end
 
   if delta <= MACHEP * xnorm
-    info = 7
+    info_ = 7
   end
 
   if gnorm <= MACHEP
-    info = 8
+    info_ = 8
   end
 
-  info != 0 && @goto L300
+  info_ != 0 && @goto L300
 
   # end of inner loop, repeat if iteration unsuccessful
   if ratio < 0.0001
@@ -823,12 +824,12 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   @label L300
   # Termination either normal or user imposed
   if iflag < 0
-    info = iflag
+    info_ = iflag
   end
   iflag = 0
   if nprint > 0
-    fcn(m, n, x, fvec, iflag)
+    fcn!(m, n, x, fvec, iflag)
   end
 
-  return x, fvec, info, nfev, fjac, ipvt, qtf 
+  return x, fvec, info_, nfev, fjac, ipvt, qtf
 end
