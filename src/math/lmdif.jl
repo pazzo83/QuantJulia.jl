@@ -116,7 +116,7 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
   # Compute the initial column norms and initialize several arrays
   ij = 1
   for j = 1:n
-    acnorm[j] = enorm(m, a[:, ij])
+    acnorm[j] = vecnorm(a[:, ij])
     rdiag[j] = acnorm[j]
     wa[j] = rdiag[j]
     if pivot != 0
@@ -164,7 +164,8 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
     # Compute the householder transformation to reduce the j-th column of a to
     # a multiple of the j-th unit vector
     jj = j + m * (j - 1)
-    ajnorm = enorm(m - (j - 1), a[jj:end])
+    jj_end = jj + (m - j)
+    ajnorm = vecnorm(a[jj:jj_end])
     if ajnorm == 0.0
       @goto L100
     end
@@ -211,7 +212,7 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
           rdiag[k] *= sqrt(temp)
           temp = rdiag[k]/wa[k]
 
-          if 0.5 * temp * temp <= MACHEP
+          if 0.05 * temp * temp <= MACHEP
             rdiag[k] = enorm(m - j, a[jp1 + m * (k - 1):end])
             wa[k] = rdiag[k]
           end
@@ -248,7 +249,7 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
   # eliminate the diagonal matrix d using a given rotation
   for j = 1:n
     l = ipvt[j]
-    if diag_[j] == 0.0
+    if diag_[l] == 0.0
       @goto L90
     end
     for k = j:n
@@ -285,7 +286,7 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
 
       # accumulate the transformation of the row s
       kp1 = k + 1
-      if n > kp1
+      if n >= kp1
         ik = kk + 1
         for i = kp1:n
           temp = cos_ * r[ik] + sin_ * sdiag[i]
@@ -318,7 +319,7 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
     end
   end
 
-  if nsing < 1
+  if nsing < 2
     @goto L150
   end
 
@@ -326,7 +327,7 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
     j = nsing - k + 1
     sum_ = 0.0
     jp1 = j + 1
-    if nsing > jp1
+    if nsing >= jp1
       ij = jp1 + ldr * (j - 1)
       for i = jp1:nsing
         sum_ += r[ij] * wa[i]
@@ -384,7 +385,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
 
   for j = 1:n
     l = ipvt[j]
-    x[j] = wa1[j]
+    x[l] = wa1[j]
   end
 
   # initialize the iteration counter, evaluate the function at the origin
@@ -394,7 +395,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     wa2[j] = diag_[j] * x[j]
   end
 
-  dxnorm = enorm(n, wa2)
+  dxnorm = vecnorm(wa2)
   fp = dxnorm - delta
 
   fp <= 0.1 * delta && @goto L220
@@ -413,7 +414,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
       jm1 = j - 1
       if jm1 >= 1
         ij = jj
-        for i = 1:jm1
+        for i = 1:jm1 + 1
           sum_ += r[ij] * wa1[i]
           ij += 1
         end
@@ -421,7 +422,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
       wa1[j] = (wa1[j] - sum_) / r[j + ldr * (j - 1)]
       jj += ldr
     end
-    temp = enorm(n, wa1)
+    temp = vecnorm(wa1)
     parl = ((fp / delta) / temp) / temp
   end
 
@@ -438,7 +439,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     jj += ldr
   end
 
-  gnorm = enorm(n, wa1)
+  gnorm = vecnorm(wa1)
   paru = gnorm / delta
   if paru == 0.0
     paru = DWARF / min(delta, 0.1)
@@ -472,7 +473,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     wa2[j] = diag_[j] * x[j]
   end
 
-  dxnorm = enorm(n, wa2)
+  dxnorm = vecnorm(wa2)
   temp = fp
   fp = dxnorm - delta
 
@@ -484,7 +485,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
   # compute the newton correction
   for j = 1:n
     l = ipvt[j]
-    wa1[l] = diag_[l] * (wa2[l] / dxnorm)
+    wa1[j] = diag_[l] * (wa2[l] / dxnorm)
   end
 
   jj = 1
@@ -501,8 +502,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     end
     jj += ldr
   end
-
-  temp = enorm(n, wa1)
+  temp = vecnorm(wa1)
   parc = ((fp / delta) / temp) / temp
 
   # depending on the sign of the function, update parl or paru
@@ -526,7 +526,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     par = 0.0
   end
 
-  return r, par, x, sdiag
+  return r, par, wa1, x, sdiag
 end
 
 function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float64}, ftol::Float64, xtol::Float64, gtol::Float64, maxFev::I, epsfcn::Float64,
@@ -557,7 +557,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   if iflag < 0
     @goto L300
   end
-  fnorm = enorm(m, fvec)
+  fnorm = vecnorm(fvec)
 
   # Initialize the levenberg-marquardt param and iteration counter
   par = 0.0
@@ -610,7 +610,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
       wa3[j] = diag_[j] * x[j]
     end
 
-    xnorm = enorm(n, wa3)
+    xnorm = vecnorm(wa3)
     delta = factor_ * xnorm
     if delta == 0.0
       delta = factor_
@@ -685,6 +685,20 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
 
   # determine the levenberg-marquardt param
   lmpar!(n, fjac, ldfjac, ipvt, diag_, qtf, delta, par, wa1, wa2, wa3, wa4)
+
+  # println("AFTER: ")
+  # println("fvec: ", fvec)
+  # println("fjac: ", fjac)
+  # println("wa1: ", wa1)
+  # println("wa2: ", wa2)
+  # println("wa3: ", wa3)
+  # println("wa4: ", wa4)
+  # println("ipvt: ", ipvt)
+  # println("diag: ", diag_)
+  # println("qtf: ", qtf)
+  # println("delta: ", delta)
+  #
+  # error("STOP")
 
   # store the direction of p and x + p, calculate the norm of p
   for j = 1:n
