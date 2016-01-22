@@ -71,6 +71,10 @@ const EPS_VAL = eps()
 export lmdif!
 include("lmdif.jl")
 
+# lmdif2.jl
+export lmdif2!
+include("lmdif2.jl")
+
 # distribution.jl
 export distribution_derivative
 include("distributions.jl")

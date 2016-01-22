@@ -78,7 +78,7 @@ type LevenbergMarquardt <: OptimizationMethod
   useCostFunctionsJacobin::Bool
 end
 
-LevenbergMarquardt() = LevenbergMarquardt(1.0e-8, 1.0e-8, 1.0e-8, false)
+LevenbergMarquardt() = LevenbergMarquardt(EPS_VAL, 1.0e-8, 1.0e-8, false)
 
 type Problem{F <: CostFunction, C <: Constraint, T, I <: Integer}
   costFunction::F
@@ -202,7 +202,7 @@ function minimize!(lm::LevenbergMarquardt, p::Problem, endCriteria::EndCriteria)
   wa3 = zeros(n)
   wa4 = zeros(n)
 
-  function fcn!{I <: Integer}(::I, n::I, x::Vector{Float64}, fvec::Vector{Float64}, ::I)
+  function fcn!{I <: Integer}(::I, n::I, x::Vector{Float64}, fvec::Vector{Float64})
     xt = x[1:n]
 
     if test(p.constraint, xt)
@@ -215,14 +215,28 @@ function minimize!(lm::LevenbergMarquardt, p::Problem, endCriteria::EndCriteria)
     return fvec
   end
 
-  function jacFcn!{I <: Integer}(m::I, n::I, x::Float64, fjac::Float64, ::I)
-    xt = fill(x + n, n)
+  # function jacFcn!{I <: Integer}(m::I, n::I, x::Float64, fjac::Float64, ::I)
+  #   xt = fill(x + n, n)
+  # end
+
+  function fcn2(x::Vector{Float64})
+    if test(p.constraint, x)
+      fvec = values!(p, x)
+    else
+      fvec = copy(initCostValues)
+    end
+
+    return fvec
   end
 
-  # TODO check requirements, see levenbergmarquardt.cpp
-  lmdif!(m, n, xx, fvec, endCriteria.functionEpsilon, lm.xtol, lm.gtol, endCriteria.maxIterations, lm.epsfcn, diag_, mode, factor_, nprint, info_, nfev, fjac, ldfjac,
-        ipvt, qtf, wa1, wa2, wa3, wa4, fcn!, jacFcn!, false)
+  # jacFcn! = Calculus.jacobian(fcn2)
 
+  # TODO check requirements, see levenbergmarquardt.cpp
+  # lmdif!(m, n, xx, fvec, endCriteria.functionEpsilon, lm.xtol, lm.gtol, endCriteria.maxIterations, lm.epsfcn, diag_, mode, factor_, nprint, info_, nfev, fjac, ldfjac,
+  #     ipvt, qtf, wa1, wa2, wa3, wa4, fcn!)
+
+  lmdif2!(n, m, x, mode, factor_, info_, lm.epsfcn, fcn!)
+  # res = lmfit(fcn2, xx, endCriteria.maxIterations)
 
 end
 

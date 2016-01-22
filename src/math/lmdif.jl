@@ -81,7 +81,7 @@ function fdjac2!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Floa
     end
 
     x[j] = temp + h
-    fcn!(m, n, x, wa, iflag)
+    fcn!(m, n, x, wa)
     if iflag < 0
       return fjac
     end
@@ -311,7 +311,7 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
   nsing = n
   for j = 1:n
     if sdiag[j] == 0.0 && nsing == n
-      nsing = j
+      nsing = j - 1
     end
 
     if nsing < n
@@ -319,7 +319,7 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
     end
   end
 
-  if nsing < 2
+  if nsing < 1
     @goto L150
   end
 
@@ -358,7 +358,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
   for j=1:n
     wa1[j] = qtb[j]
     if r[jj] == 0.0 && nsing == n
-      nsing = j
+      nsing = j - 1
     end
     if nsing < n
       wa1[j] = 0.0
@@ -373,7 +373,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
       wa1[j] = wa1[j] / r[j + ldr * (j - 1)]
       temp = wa1[j]
       jm1 = j - 1
-      if jm1 >= 1
+      if jm1 > 0
         ij = ldr * (j - 1) + 1
         for i = 1:jm1 + 1
           wa1[i] -= r[ij] * temp
@@ -531,7 +531,7 @@ end
 
 function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float64}, ftol::Float64, xtol::Float64, gtol::Float64, maxFev::I, epsfcn::Float64,
                 diag_::Vector{Float64}, mode::I, factor_::Float64, nprint::I, info_::I, nfev::I, fjac::Matrix{Float64}, ldfjac::I, ipvt::Vector{I}, qtf::Vector{Float64},
-                wa1::Vector{Float64}, wa2::Vector{Float64}, wa3::Vector{Float64}, wa4::Vector{Float64}, fcn!::Function, jacFcn!::Function, useJac::Bool = true)
+                wa1::Vector{Float64}, wa2::Vector{Float64}, wa3::Vector{Float64}, wa4::Vector{Float64}, fcn!::Function)
 
   delta = 0
   xnorm = 0
@@ -552,7 +552,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
 
   # Evaluate the function at its starting point and calculate its norm
   iflag = 1
-  fcn!(m, n, x, fvec, iflag)
+  fcn!(m, n, x, fvec)
   nfev = 1
   if iflag < 0
     @goto L300
@@ -566,11 +566,12 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   @label L30
   # Calcualte the Jacobian matrix
   iflag = 2
-  if useJac
-    jacFcn!(m, n, x, fjac, iflag)
-  else
-    fdjac2!(m, n, x, fvec, fjac, ldfjac, iflag, epsfcn, wa4, fcn!)
-  end
+  # if useJac
+  #   jacFcn!(m, n, x, fjac, iflag)
+  # else
+  fdjac2!(m, n, x, fvec, fjac, ldfjac, iflag, epsfcn, wa4, fcn!)
+  # end
+  # fjac = jacFcn!(x)
 
   nfev += n
 
@@ -582,7 +583,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   if nprint > 0
     iflag = 0
     if mod(iter - 1, nprint) == 0
-      fcn!(m, n, x, fvec, iflag)
+      fcn!(m, n, x, fvec)
       if iflag < 0
         @goto L300
       end
@@ -591,6 +592,15 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
 
   # compute the QR factorization of the Jacobian
   qrfac!(m, n, fjac, ldfjac, 1, ipvt, n, wa1, wa2, wa3)
+  # qr = qrfact(fjac, Val{true})
+  # q = qr[:Q]
+  #
+  # println("fvec: ", fvec)
+  #
+  # println("next: ", q' * fvec)
+  #
+  #
+  # error("break")
 
   # on the first iteration and if mode is 1, scale according to the norms
   # of the columns in the initial jacobin
@@ -644,6 +654,9 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     jj += m + 1
     qtf[j] = wa4[j]
   end
+
+  # println("qtf: ", qtf)
+  # error("break")
 
   # compute the norm of the scaled gradient
   gnorm = 0.0
@@ -707,7 +720,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     wa3[j] = diag_[j] * wa1[j]
   end
 
-  pnorm = enorm(n, wa3)
+  pnorm = vecnorm(wa3)
 
   # on the initial iteration, adjust the initial step bound
   if iter == 1
@@ -715,17 +728,21 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   end
 
   iflag = 1
-  fcn!(m, n, wa2, wa4, iflag)
+  fcn!(m, n, wa2, wa4)
   nfev += 1
 
   if iflag < 0
     @goto L300
   end
 
-  fnorm1 = enorm(m, wa4)
+  fnorm1 = vecnorm(wa4)
+  # println(wa4)
 
   # Compute the scaled actual reduction
   actred = -1.0
+
+  # println("fnorm: ", fnorm)
+  # println("fnorm1: ", fnorm1)
 
   if (0.1 * fnorm1) < fnorm
     temp = fnorm1 / fnorm
@@ -747,10 +764,15 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     jj += m
   end
 
-  temp1 = enorm(n, wa3) / fnorm
+  temp1 = vecnorm(wa3) / fnorm
   temp2 = (sqrt(par) * pnorm) / fnorm
   prered = temp1 * temp1 + (temp2 * temp2) / 0.5
   dirder = -(temp1 * temp1 + temp2 * temp2)
+
+  # println("temp1: ", temp1)
+  # println("temp2: ", temp2)
+  # println("prered: ", prered)
+  # println("dirder: ", dirder)
 
   # Compute the ratio of the actual to the predicted reduction
   ratio = 0.0
@@ -777,7 +799,6 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
       par = 0.5 * par
     end
   end
-
   # test for successful iteration
   if ratio > 0.0001
     for j = 1:n
@@ -842,7 +863,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   end
   iflag = 0
   if nprint > 0
-    fcn!(m, n, x, fvec, iflag)
+    fcn!(m, n, x, fvec)
   end
 
   return x, fvec, info_, nfev, fjac, ipvt, qtf
