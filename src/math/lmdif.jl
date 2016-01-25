@@ -1,69 +1,69 @@
 const MACHEP = 1.2e-16
 const DWARF = 1.0e-38
 
-function enorm{I <: Integer}(n::I, x::Vector{Float64})
-  const rdwarf = 3.834e-20
-  const rgiant = 1.304e19
-
-  s1 = s2 = s3 = x1max = x3max = 0.0
-
-  floatn = float(n)
-  agiant = rgiant / floatn
-
-  for i = 1:n
-    xabs = abs(x[i])
-    if xabs > rdwarf && xabs < agiant
-      # sum for intermediate components
-      s2 += xabs * xabs
-      continue
-    end
-
-    if xabs > rdwarf
-      # sum for larger components
-      if xabs > x1max
-        temp = x1max / xabs
-        s1 = 1.0 + s1 * temp * temp
-        x1max = xabs
-      else
-        temp = xabs / x1max
-        s1 += temp * temp
-      end
-
-      continue
-    end
-
-    # sum for smaller components
-    if xabs > x3max
-      temp = x3max / xabs
-      s3 = 1.0 + s3 * temp * temp
-      x3max = xabs
-    else
-      if xabs != 0.0
-        temp = xabs / x3max
-        s3 += temp * temp
-      end
-    end
-  end
-
-  # Calculation of norm
-  if s1 != 0.0
-    temp = s1 + (s2 / x1max) / x1max
-    return x1max * sqrt(temp)
-  end
-
-  if s2 != 0.0
-    if s2 >= x3max
-      temp = s2 * (1.0 + (x3max / s2) * (x3max * s3))
-    else
-      temp = x3max * ((s2 / x3max) + (x3max * s3))
-    end
-    ans = sqrt(temp)
-  else
-    ans = x3max * sqrt(s3)
-  end
-
-  return ans
-end
+# function enorm{I <: Integer}(n::I, x::Vector{Float64})
+#   const rdwarf = 3.834e-20
+#   const rgiant = 1.304e19
+#
+#   s1 = s2 = s3 = x1max = x3max = 0.0
+#
+#   floatn = float(n)
+#   agiant = rgiant / floatn
+#
+#   for i = 1:n
+#     xabs = abs(x[i])
+#     if xabs > rdwarf && xabs < agiant
+#       # sum for intermediate components
+#       s2 += xabs * xabs
+#       continue
+#     end
+#
+#     if xabs > rdwarf
+#       # sum for larger components
+#       if xabs > x1max
+#         temp = x1max / xabs
+#         s1 = 1.0 + s1 * temp * temp
+#         x1max = xabs
+#       else
+#         temp = xabs / x1max
+#         s1 += temp * temp
+#       end
+#
+#       continue
+#     end
+#
+#     # sum for smaller components
+#     if xabs > x3max
+#       temp = x3max / xabs
+#       s3 = 1.0 + s3 * temp * temp
+#       x3max = xabs
+#     else
+#       if xabs != 0.0
+#         temp = xabs / x3max
+#         s3 += temp * temp
+#       end
+#     end
+#   end
+#
+#   # Calculation of norm
+#   if s1 != 0.0
+#     temp = s1 + (s2 / x1max) / x1max
+#     return x1max * sqrt(temp)
+#   end
+#
+#   if s2 != 0.0
+#     if s2 >= x3max
+#       temp = s2 * (1.0 + (x3max / s2) * (x3max * s3))
+#     else
+#       temp = x3max * ((s2 / x3max) + (x3max * s3))
+#     end
+#     ans = sqrt(temp)
+#   else
+#     ans = x3max * sqrt(s3)
+#   end
+#
+#   return ans
+# end
 
 # Forward Difference Approximation #
 function fdjac2!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float64}, fjac::Matrix{Float64}, ::I, iflag::I, epsfcn::Float64, wa::Vector{Float64}, fcn!::Function)
@@ -213,7 +213,8 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
           temp = rdiag[k]/wa[k]
 
           if 0.05 * temp * temp <= MACHEP
-            rdiag[k] = enorm(m - j, a[jp1 + m * (k - 1):end])
+            a_start = jp1 + m * (k - 1)
+            rdiag[k] = vecnorm(a[a_start:a_start + (m-j) - 1])
             wa[k] = rdiag[k]
           end
         end
@@ -340,8 +341,8 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
   @label L150
   # permute the components of z back to components of x
   for j = 1:n
-    l = ipvt[j]
-    x[l] = wa[j]
+    # l = ipvt[j]
+    x[ipvt[j]] = wa[j]
   end
 
   return r, x, sdiag
@@ -463,9 +464,10 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
   end
 
   temp = sqrt(par)
-  for j = 1:n
-    wa1[j] = temp * diag_[j]
-  end
+  # for j = 1:n
+  #   wa1[j] = temp * diag_[j]
+  # end
+  wa1 = temp * diag_
 
   qrsolv!(n, r, ldr, ipvt, wa1, qtb, x, sdiag, wa2)
 
@@ -526,15 +528,15 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     par = 0.0
   end
 
-  return r, par, wa1, x, sdiag
+  return par
 end
 
 function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float64}, ftol::Float64, xtol::Float64, gtol::Float64, maxFev::I, epsfcn::Float64,
                 diag_::Vector{Float64}, mode::I, factor_::Float64, nprint::I, info_::I, nfev::I, fjac::Matrix{Float64}, ldfjac::I, ipvt::Vector{I}, qtf::Vector{Float64},
                 wa1::Vector{Float64}, wa2::Vector{Float64}, wa3::Vector{Float64}, wa4::Vector{Float64}, fcn!::Function)
 
-  delta = 0
-  xnorm = 0
+  delta = 0.0
+  xnorm = 0.0
   info_ = 0
   iflag = 0
   nfev = 0
@@ -655,7 +657,12 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     qtf[j] = wa4[j]
   end
 
+
+  # println("wa1: ", wa1)
+  # println("wa2: ", wa2)
   # println("qtf: ", qtf)
+  # println("wa4: ", wa4)
+  # println("fjac: ", fjac)
   # error("break")
 
   # compute the norm of the scaled gradient
@@ -697,7 +704,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   @label L200
 
   # determine the levenberg-marquardt param
-  lmpar!(n, fjac, ldfjac, ipvt, diag_, qtf, delta, par, wa1, wa2, wa3, wa4)
+  par = lmpar!(n, fjac, ldfjac, ipvt, diag_, qtf, delta, par, wa1, wa2, wa3, wa4)
 
   # println("AFTER: ")
   # println("fvec: ", fvec)
@@ -809,7 +816,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
       fvec[i] = wa4[i]
     end
 
-    xnorm = enorm(n, wa2)
+    xnorm = vecnorm(wa2)
     fnorm = fnorm1
     iter += 1
   end

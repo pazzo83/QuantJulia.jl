@@ -11,8 +11,34 @@ type CalibrationHelperCommon
   CalibrationHelperCommon() = new(0.0, RelativePriceError())
 end
 
+type ImpliedVolatilityHelper{C <: CalibrationHelper}
+  helper::C
+  value::Float64
+end
+
+function operator(iv::ImpliedVolatilityHelper)
+  function _inner(x::Float64)
+    return iv.value - black_price!(iv.helper, x)
+  end
+
+  return _inner
+end
+
 calibration_error{C <: CalibrationHelper}(::RelativePriceError, helper::C) =
   abs(helper.calibCommon.marketValue - model_value!(helper)) / helper.calibCommon.marketValue
+
+function implied_volatility!{C <: CalibrationHelper, I <: Integer}(ch::C, targetValue::Float64, accuracy::Float64, maxEvals::I, minVol::Float64, maxVol::Float64)
+  ivh = ImpliedVolatilityHelper(ch, targetValue)
+
+  solv = BrentSolver(maxEvals)
+
+  return solve(solv, operator(ivh), accuracy, ch.volatility.value, minVol, maxVol)
+end
+
+function update_pricing_engine!{C <: CalibrationHelper, P <: PricingEngine}(ch::C, pe::P)
+  ch.pricingEngine = pe
+  return ch
+end
 
 type SwaptionHelper{Dm <: Dates.Period, Dl <: Dates.Period, DC_fix <: DayCount, DC_float <: DayCount, T <: YieldTermStructure, P <: PricingEngine} <: CalibrationHelper
   lazyMixin::LazyMixin
@@ -106,7 +132,8 @@ function black_price!(swaptionHelper::SwaptionHelper, sigma::Float64)
   calculate!(swaptionHelper)
   # stuff
   black = BlackSwaptionEngine(swaptionHelper.yts, Quote(sigma), Actual365(), swaptionHelper.shift)
-  swaptionHelper.swaption.pricingEngine = black
+  update_pricing_engine!(swaptionHelper.swaption, black)
+  # swaptionHelper.swaption.pricingEngine = black
   value = npv(swaptionHelper.swaption)
   return value
 end

@@ -12,4 +12,12 @@ type G2FittingParameter{T <: TermStructure} <: Parameter
   ts::T
 end
 
+type HullWhiteFittingParameter{T <: TermStructure} <: Parameter
+  a::Float64
+  sigma::Float64
+  ts::T
+end
+
+NullParameter{P <: DataType}(_type::P) = _type([0.0], NoConstraint())
+
 test_params(c::ConstantParameter, params::Vector{Float64}) = QuantJulia.Math.test(c.constraint, params)

@@ -77,7 +77,7 @@ function forward_rate{T <: YieldTermStructure, C <: CompoundingType, F <: Freque
     interval, compound = (time2 - time1, discount(yts, time1) / discount(yts, time2))
   end
 
-  return implied_rate(compound, dc, comp, interval, freq)
+  return implied_rate(compound, yts.dc, comp, interval, freq)
 end
 
 ## FlatForwardTermStructure

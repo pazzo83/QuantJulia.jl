@@ -46,6 +46,19 @@ type G2SwaptionEngine{Y <: YieldTermStructure, I <: Integer} <: PricingEngine{Y}
   intervals::I
 end
 
+type JamshidianSwaptionEngine{S <: ShortRateModel, Y <: YieldTermStructure} <: PricingEngine{Y}
+  model::ShortRateModel
+  ts::Y
+
+  function call{S}(::Type{JamshidianSwaptionEngine}, model::S)
+    new{S, YieldTermStructure}(model)
+  end
+
+  function call{S, Y}(::Type{JamshidianSwaptionEngine}, model::S, yts::Y)
+    new{S, Y}(model, yts)
+  end
+end
+
 type DiscretizedSwap <: DiscretizedAsset
   fixedResetTimes::Vector{Float64}
   fixedPayTimes::Vector{Float64}
@@ -154,7 +167,7 @@ function mandatory_times(discretizedSwaption::DiscretizedSwaption)
 end
 
 ## General Pricing Functions ##
-function black_formula{T <: OptionType}(optionType::T, strike::Float64, forward::Float64, stdDev::Float64, discount::Float64, displacement::Float64)
+function black_formula{T <: OptionType}(optionType::T, strike::Float64, forward::Float64, stdDev::Float64, discount::Float64 = 1.0, displacement::Float64 = 0.0)
   # TODO check requirements (see cpp)
   opt_type = QuantJulia.value(optionType)
   if stdDev == 0.0
@@ -303,6 +316,52 @@ function _calculate!(pe::G2SwaptionEngine, swaption::Swaption)
   correction = swap.spread * abs(floating_leg_BPS(swap) / fixed_leg_BPS(swap))
   fixedRate = swap.fixedRate - correction
   swaption.results.value = gen_swaption(pe.model, swaption, fixedRate, pe.range, pe.intervals)
+
+  return swaption
+end
+
+function _calculate!(pe::JamshidianSwaptionEngine, swaption::Swaption)
+  tsmodel = pe.model
+  ref_date = reference_date(tsmodel.ts)
+  dc = tsmodel.ts.dc
+
+  amounts = copy(swaption.swap.args.fixedCoupons)
+  amounts[end] += swaption.swap.nominal
+
+  maturity = year_fraction(dc, ref_date, swaption.exercise.dates[1])
+
+  fixedPayTimes = zeros(length(swaption.swap.args.fixedPayDates))
+  valueTime = year_fraction(dc, ref_date, swaption.swap.args.fixedResetDates[1])
+  for i = 1:length(fixedPayTimes)
+    fixedPayTimes[i] = year_fraction(dc, ref_date, swaption.swap.args.fixedPayDates[i])
+  end
+
+  finder = RStarFinder(tsmodel, swaption.swap.nominal, maturity, valueTime, fixedPayTimes, amounts)
+
+  minStrike = -10.0
+  maxStrike = 10.0
+  slv = BrentSolver(10000, true, true, minStrike, maxStrike)
+
+  rStar = solve(slv, operator(finder), 1e-8, 0.05, minStrike, maxStrike)
+
+  w = isa(swaption.swap.swapT, Payer) ? Put() : Call()
+
+  _size = length(swaption.swap.args.fixedCoupons)
+
+  val = 0.0
+  _B = discount_bond(tsmodel, maturity, valueTime, rStar)
+
+  for i = 1:_size
+    fixedPayTime = year_fraction(dc, ref_date, swaption.swap.args.fixedPayDates[i])
+
+    strike = discount_bond(tsmodel, maturity, fixedPayTime, rStar) / _B
+
+    dboValue = discount_bond_option(tsmodel, w, strike, maturity, valueTime, fixedPayTime)
+
+    val += amounts[i] * dboValue
+  end
+
+  swaption.results.value = val
 
   return swaption
 end

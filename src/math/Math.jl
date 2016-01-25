@@ -95,7 +95,7 @@ include("solvers.jl")
 
 # optimization.jl
 export Projection, CostFunction, Constraint, NoConstraint, PositiveConstraint, BoundaryConstraint, ProjectedConstraint, OptimizationMethod, LevenbergMarquardt, Simplex, Problem, EndCriteria,
-project, minimize!, minimize_2!
+project, minimize!, minimize_2!, include_params
 
 include("optimization.jl")
 

@@ -56,6 +56,22 @@ function func_values(calibF::CalibrationFunction, params::Vector{Float64})
   return values
 end
 
+function value(calibF::CalibrationFunction, params::Vector{Float64})
+  set_params!(calibF.model, params)
+  _value = 0.0
+  for i = 1:length(calibF.helpers)
+    diff = calibration_error(calibF.helpers[i].calibCommon.calibrationErrorType, calibF.helpers[i])
+    _value += diff * diff * calibF.weights[i]
+  end
+
+  return sqrt(_value)
+end
+
+# accessor methods ##
+get_a{M <: ShortRateModel}(m::M) = m.a.data[1]
+get_sigma{M <: ShortRateModel}(m::M) = m.sigma.data[1]
+get_b{M <: ShortRateModel}(m::M) = m.b.data[1]
+
 type G2{T <: TermStructure} <: ShortRateModel
   a::ConstantParameter
   sigma::ConstantParameter
@@ -81,14 +97,12 @@ function G2{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 = 0.01, 
   return G2(a_const, sigma_const, b_const, eta_const, rho_const, phi, ts, privateConstraint)
 end
 
-# accessor methods ##
-get_a(m::G2) = m.a.data[1]
-get_sigma(m::G2) = m.sigma.data[1]
-get_b(m::G2) = m.b.data[1]
 get_eta(m::G2) = m.eta.data[1]
 get_rho(m::G2) = m.rho.data[1]
 
 get_params(m::G2) = Float64[get_a(m), get_sigma(m), get_b(m), get_eta(m), get_rho(m)]
+
+generate_arguments!(m::G2) = m.phi = G2FittingParameter(get_a(m), get_sigma(m), get_b(m), get_eta(m), get_rho(m), m.ts)
 
 function V(m::G2, t::Float64)
   expat = exp(-get_a(m) * t)
@@ -194,9 +208,78 @@ function operator(pricingFunc::G2SwaptionPricingFunction)
   return _inner
 end
 
+type HullWhite{T <: TermStructure} <: ShortRateModel
+  r0::Float64
+  a::ConstantParameter
+  sigma::ConstantParameter
+  phi::HullWhiteFittingParameter
+  ts::T
+  privateConstraint::PrivateConstraint
+end
 
+function HullWhite{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 = 0.01)
+  _rate = forward_rate(ts, 0.0, 0.0, ContinuousCompounding(), NoFrequency())
+  r0 = _rate.rate
+  a_const = ConstantParameter([a], PositiveConstraint())
+  sigma_const = ConstantParameter([sigma], PositiveConstraint())
 
-function set_params!(model::G2, params::Vector{Float64})
+  privateConstraint = PrivateConstraint(ConstantParameter[a_const, sigma_const])
+
+  phi  = HullWhiteFittingParameter(a, sigma, ts)
+
+  return HullWhite(r0, a_const, sigma_const, phi, ts, privateConstraint)
+end
+
+get_params(m::HullWhite) = Float64[get_a(m), get_sigma(m)]
+
+generate_arguments!(m::HullWhite) = m.phi = HullWhiteFittingParameter(get_a(m), get_sigma(m), m.ts)
+
+type RStarFinder{M <: ShortRateModel}
+  model::M
+  strike::Float64
+  maturity::Float64
+  valueTime::Float64
+  fixedPayTimes::Vector{Float64}
+  amounts::Vector{Float64}
+end
+
+function operator(rsf::RStarFinder)
+  function _inner(x::Float64)
+    _value = rsf.strike
+    _B = discount_bond(rsf.model, rsf.maturity, rsf.valueTime, x)
+    sz = length(rsf.fixedPayTimes)
+    for i = 1:sz
+      dbVal = discount_bond(rsf.model, rsf.maturity, rsf.fixedPayTimes[i], x) / _B
+      _value -= rsf.amounts[i] * dbVal
+    end
+
+    return _value
+  end
+
+  return _inner
+end
+
+function B(model::HullWhite, t::Float64, T::Float64)
+  _a = get_a(model)
+  if _a < sqrt(eps())
+    return T - t
+  else
+    return (1.0 - exp(-_a * (T - t))) / _a
+  end
+end
+
+function A(model::HullWhite, t::Float64, T::Float64)
+  discount1 = discount(model.ts, t)
+  discount2 = discount(model.ts, T)
+
+  forward = forward_rate(model.ts, t, t, ContinuousCompounding(), NoFrequency())
+  temp = get_sigma(model) * B(model, t, T)
+  val = B(model, t, T) * forward.rate - 0.25 * temp * temp * B(model, 0.0, 2.0* t)
+
+  return exp(val) * discount2 / discount1
+end
+
+function set_params!{M <: ShortRateModel}(model::M, params::Vector{Float64})
   paramCount = 1
   args = model.privateConstraint.arguments
   for i = 1:length(args)
@@ -206,7 +289,8 @@ function set_params!(model::G2, params::Vector{Float64})
        paramCount += 1
      end
    end
-   model.phi = G2FittingParameter(get_a(model), get_sigma(model), get_b(model), get_eta(model), get_rho(model), model.ts)
+   generate_arguments!(model)
+   # model.phi = G2FittingParameter(get_a(model), get_sigma(model), get_b(model), get_eta(model), get_rho(model), model.ts)
    return model
  end
 
@@ -228,6 +312,10 @@ function calibrate!{M <: ShortRateModel, C <: CalibrationHelper, O <: Optimizati
 
   # minimization
   minimize!(method, prob, endCriteria)
+  res = prob.currentValue
+  set_params!(model, include_params(proj, res))
+
+  return model
 end
 
 function gen_swaption{I <: Integer}(model::G2, swaption::Swaption, fixedRate::Float64, range::Float64, intervals::I)
@@ -248,3 +336,20 @@ function gen_swaption{I <: Integer}(model::G2, swaption::Swaption, fixedRate::Fl
   integrator = SegmentIntegral(intervals)
   return swaption.swap.nominal * w * discount(model.ts, startTime) * QuantJulia.Math.operator(integrator, QuantJulia.operator(func), lower, upper)
 end
+
+discount_bond{M <: ShortRateModel}(model::M, tNow::Float64, maturity::Float64, _rate::Float64) = A(model, tNow, maturity) * exp(-B(model, tNow, maturity) * _rate)
+
+function discount_bond_option{O <: OptionType}(model::HullWhite, optionType::O, strike::Float64, maturity::Float64, bondStart::Float64, bondMaturity::Float64)
+  _a = get_a(model)
+  if _a < sqrt(eps())
+    v = get_sigma(model) * B(model, bondStart, bondMaturity) * sqrt(maturity)
+  else
+    v = get_sigma(model) / (_a * sqrt(2.0 * _a)) * sqrt(exp(-2.0 * _a * (bondStart - maturity)) - exp(-2.0 * _a * bondStart) - 2.0 * (exp(-_a * (bondStart + bondMaturity - 2.0 * maturity))
+        - exp(-_a * (bondStart + bondMaturity))) + exp(-2.0 * _a * (bondMaturity - maturity)) - exp(-2.0 * _a * bondMaturity))
+  end
+
+   f = discount(model.ts, bondMaturity)
+   k = discount(model.ts, bondStart) * strike
+
+   return black_formula(optionType, k, f, v)
+ end

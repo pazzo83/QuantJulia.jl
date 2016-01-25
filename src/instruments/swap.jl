@@ -27,12 +27,14 @@ type VanillaSwapArgs
   fixedPayDates::Vector{Date}
   floatingResetDates::Vector{Date}
   floatingPayDates::Vector{Date}
+  fixedCoupons::Vector{Float64}
 end
 
 function VanillaSwapArgs{L <: Leg}(legs::Vector{L})
   fixedCoups = legs[1].coupons
   floatingCoups = legs[2].coupons
-  return VanillaSwapArgs(get_reset_dates(fixedCoups), get_pay_dates(fixedCoups), get_reset_dates(floatingCoups), get_pay_dates(floatingCoups))
+  fixedCoupons = [amount(coup) for coup in legs[1].coupons]
+  return VanillaSwapArgs(get_reset_dates(fixedCoups), get_pay_dates(fixedCoups), get_reset_dates(floatingCoups), get_pay_dates(floatingCoups), fixedCoupons)
 end
 
 function reset!(sr::SwapResults)

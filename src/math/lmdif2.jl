@@ -18,15 +18,24 @@ function jacFcnDefault!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vect
   return fjac
 end
 
-function lm_qrsolv{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector{Float64}, diag::Vector{Float64}, qtb::Vector{Float64}, x::Vector{Float64}, sdiag::Vector{Float64}, W::Vector{Float64})
+function lm_qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector{I}, diagonal::Vector{Float64}, qtb::Vector{Float64}, x::Vector{Float64}, sdiag::Vector{Float64}, W::Vector{Float64})
 
   # Copy R and Q'* b to preserve input and initialize S
   # In particular, save the diagonal elements of R in x
 
   # instead of loop...
-  r = triu(r) + triu(r)'
-  x = diag(r)
-  W = qtb
+  # r = triu(r) + triu(r)'
+  # x = diag(r)
+  # W = qtb
+
+  for j = 1:n
+    for i = j:n
+      r[(j-1) * ldr + i] = r[(i-1)*ldr + j]
+    end
+
+    x[j] = r[(j-1) * ldr + j]
+    W[j] = qtb[j]
+  end
 
   # eliminate the diagonal matrix D using a Givens rotation
   for j = 1:n
@@ -47,16 +56,16 @@ function lm_qrsolv{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector
         kk = k + ldr * (k - 1)
         if abs(r[kk]) < abs(sdiag[k])
           _cot = r[kk] / sdiag[k]
-          _sin = 1 / hypot(1, _cot)
+          _sin = 1.0 / hypot(1.0, _cot)
           _cos = _sin * _cot
         else
           _tan = sdiag[k] / r[kk]
-          _cos = 1 / hypot(1, _tan)
+          _cos = 1.0 / hypot(1.0, _tan)
           _sin = _cos * _tan
         end
 
         # compute the modified diagonal element of R and the modified element of Q' * b, 0
-        r[kk] = _cos * r[kk] * _sin * sdiag[k]
+        r[kk] = _cos * r[kk] + _sin * sdiag[k]
         temp = _cos * W[k] + _sin * qtbpj
         qtbpj = -_sin * W[k] + _cos * qtbpj
         W[k] = temp
@@ -64,7 +73,7 @@ function lm_qrsolv{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector
         # accumulate the transformation in the row of S
         for i = k+1:n
           temp = _cos * r[(k - 1) * ldr + i] + _sin * sdiag[i]
-          sdiag[i] = -sin * r[(k-1) * ldr + i] + _cos * sdiag[i]
+          sdiag[i] = -_sin * r[(k-1) * ldr + i] + _cos * sdiag[i]
           r[(k-1) * ldr + i] = temp
         end
       end
@@ -86,13 +95,13 @@ function lm_qrsolv{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector
     end
   end
 
-  for j = nsing-1:-1:1
+  for j = nsing:-1:1
     _sum = 0.0
-    for i = j+1:-1:1 # check this
+    for i = j+1:nsing # check this
       _sum += r[(j-1) * ldr + i] * W[i]
     end
 
-    W[j] = (W[j] - sum) / sdiag[j]
+    W[j] = (W[j] - _sum) / sdiag[j]
   end
 
   # permute the components of z back to the components of x
@@ -102,12 +111,12 @@ function lm_qrsolv{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector
 end
 
 
-function lm_lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector{I}, diagonal::Vector{Float64}, qtb::Vector{Float64}, delta::Float64, par::Float64,
+function lm_lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector{I}, diagonal::Vector{Float64}, qtb::Vector{Float64}, delta::Float64, par::Float64,
                   x::Vector{Float64}, sdiag::Vector{Float64}, aux::Vector{Float64}, xdi::Vector{Float64})
 
   # Compute and store in x the Gauss-Newton direction.  If the jacobian is rank-deficient, obtain a least-squares solution
 
-  println("here i am")
+  # println("here i am")
 
   nsing = n
   for j = 1:n
@@ -141,7 +150,7 @@ function lm_lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector{
   fp = dxnorm - delta
   if fp <= 0.1 * delta
     par = 0.0
-    return
+    return par
   end
 
   # if the jacobian is not rank deficient, the newton step provides a lower bound, parl, for the zero of the function.  Otherwise,
@@ -180,8 +189,10 @@ function lm_lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector{
   gnorm = vecnorm(aux)
   paru = gnorm / delta
   if paru == 0.0
-    paru = LM_DWARF / min(delta, 0.1)
+    paru = DWARF / min(delta, 0.1)
   end
+
+  # if the input par lies outside of the interval (parl, paru), set par to the closer endpoint
 
   par = max(par, parl)
   par = min(par, paru)
@@ -190,21 +201,18 @@ function lm_lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector{
   end
 
   # iterate
-  iter = 1
-  println("oh, hi")
-  while true
+  for iter=1:10
     # evaluate the function at the current value of par
-    println("hi")
     if par == 0.0
-      par = max(LM_DWARF, 0.001 * paru)
+      par = max(DWARF, 0.001 * paru)
     end
 
     temp = sqrt(par)
     aux = diagonal * temp
 
-    lm_qrsolv(n, r, ldr, pivot, aux, qtb, x, sdiag, xdi)
+    lm_qrsolv!(n, r, ldr, pivot, aux, qtb, x, sdiag, xdi)
 
-    xdi = diagonal * x
+    xdi = diagonal .* x
     dxnorm = vecnorm(xdi)
     fp_old = fp
     fp = dxnorm - delta
@@ -213,6 +221,7 @@ function lm_lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector{
       break
     end
 
+    # Compute the Newton correctly
     for j = 1:n
       aux[j] = diagonal[pivot[j]] * xdi[pivot[j]] / dxnorm
     end
@@ -236,9 +245,11 @@ function lm_lmpar{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, pivot::Vector{
 
     par = max(parl, par * parc)
   end
+  return par
 end
 
-function lmdif2!{I <: Integer}(n::I, m::I, x::Vector{Float64}, mode::I, factor_::Float64, info_::I, epsfcn::Float64, fcn!::Function, jacFcn!::Function = jacFcnDefault!)
+function lmdif2!{I <: Integer}(n::I, m::I, x::Vector{Float64}, mode::I, factor_::Float64, info_::I, epsfcn::Float64, ftol::Float64, xtol::Float64, gtol::Float64,
+                maxIter::I, fcn!::Function, jacFcn!::Function = jacFcnDefault!)
   converged = false
   x_converged = false
   g_converged = false
@@ -275,14 +286,14 @@ function lmdif2!{I <: Integer}(n::I, m::I, x::Vector{Float64}, mode::I, factor_:
 
     # println(fjac)
 
-    qr = qrfact(fjac, Val{true})
+    qr = qrfact!(fjac, Val{true})
     # println(qr)
     # println("=======")
     # println(qr[:Q])
     # println("=======")
     # println(qr[:R])
 
-    q = qr[:Q]
+    q = full(qr[:Q])
     r = qr[:R]
     pivot = qr[:p]
     wa1 = diag(r) # rdiag
@@ -293,11 +304,17 @@ function lmdif2!{I <: Integer}(n::I, m::I, x::Vector{Float64}, mode::I, factor_:
     # println("next: ", q' * fvec)
 
     # Form q' * fvec and store in qtf
+    #fjac = q
+    wf = fjac * fvec
     qtf[1:n] = q' * fvec
 
-    println("wa1: ", wa1)
-    println("wa2: ", wa2)
-    println("qtf: ", qtf)
+    # println("wa1: ", wa1)
+    # println("wa2: ", wa2)
+    # println("qtf: ", qtf)
+    # println("wf: ", wf)
+    # println("fjac: ", fjac)
+    #
+    # error("break")
 
     # Compute norm of scaled gradient and detect degeneracy
     gnorm = 0.0
@@ -307,15 +324,21 @@ function lmdif2!{I <: Integer}(n::I, m::I, x::Vector{Float64}, mode::I, factor_:
       end
       _sum = 0.0
       for i = 1:j
-        _sum += fjac[j, i] * qtf[i]
+        _sum += fjac[i, j] * qtf[i]
       end
 
       gnorm = max(gnorm, abs(_sum / wa2[pivot[j]] / fnorm))
     end
 
     # terminate if gnorm <= gtol
+    if gnorm <= gtol
+      info_ = 4
+      converged = true
+      break
+    end
+
     if iterCount == 1
-      diagonal = wa2
+      diagonal = copy(wa2)
       wa3 = diagonal .* x
       xnorm = vecnorm(wa3)
 
@@ -327,16 +350,115 @@ function lmdif2!{I <: Integer}(n::I, m::I, x::Vector{Float64}, mode::I, factor_:
     inner_success = false
 
     while ~inner_success
-      lm_lmpar(n, fjac, m, pivot, diagonal, qtf, delta, par, wa1, wa2, wf, wa3)
+      par = lm_lmpar!(n, fjac, m, pivot, diagonal, qtf, delta, par, wa1, wa2, wf, wa3)
 
-      println(par)
+      pnorm = vecnorm(wa3)
 
-      error("breakaaaa")
-    end
+      temp2 = par * (pnorm / fnorm)^2
 
+      for j = 1:n
+        wa3[j] = 0.0
+        for i = 1:j
+          wa3[i] -= fjac[i, j] * wa1[pivot[j]]
+        end
+      end
 
+      temp1 = (vecnorm(wa3) / fnorm)^2
 
+      prered = temp1 + 2.0 * temp2
+      dirder = -temp1 + temp2
 
-    error("break")
-  end
+      # at first call, adjust the initial step bound
+      if iterCount == 1 && pnorm < delta
+        delta = pnorm
+      end
+
+      # Evaluate the function at x + p
+      wa2 = x - wa1
+      fcn!(m, n, wa2, wf)
+      f_calls += 1
+
+      fnorm1 = vecnorm(wf)
+
+      # Evaluate the scaled reduction
+      actred = 1.0 - (fnorm1 / fnorm)^2
+
+      # ratio of actual to predicted reduction
+      ratio = prered > 0.0 ? actred / prered : 0.0
+
+      # Update the step bound
+      if ratio <= 0.25
+        if actred >= 0.0
+          temp = 0.5
+        elseif actred > -99.0
+          temp = max(dirder / (2.0 * dirder + actred), 0.1)
+        else
+          temp = 0.1
+        end
+
+        delta = temp * min(delta, pnorm / 0.1)
+        par /= temp
+      elseif ratio >= 0.75
+        delta = 2.0 * pnorm
+        par *= 0.5
+      elseif par == 0.0
+        delta = 2.0 * pnorm
+      end
+
+      # on success, update solution and test for convergence
+      inner_success = ratio >= 1e-4
+
+      if inner_success
+        x = copy(wa2)
+        wa2 = diagonal .* x
+        fvec = copy(wf)
+
+        xnorm = vecnorm(wa2)
+        fnorm = fnorm1
+
+        # Convergence tests
+        info_ = 0
+
+        if fnorm <= DWARF
+          info_= 10 # success: sum of squares is almost 0
+          converged = true
+          break
+        end
+
+        if abs(actred) <= ftol && prered <= ftol && ratio <= 2.0
+          info_ = 1 # success: x is almost stable
+        end
+
+        if delta <= xtol * xnorm
+          info_ += 2 # success: sum of squares is almost stable
+        end
+
+        if info_ != 0
+          converged = true
+          break
+        end
+
+        # Tests for termination and stringent tolerances
+        if abs(actred) <= MACHEP && prered <= MACHEP && ratio <= 2.0
+          info_ = 6
+          converged = true
+          break
+        end
+
+        if delta <= MACHEP * xnorm
+          info_ = 7
+          converged = true
+          break
+        end
+
+        if gnorm <= MACHEP
+          info_ = 8
+          converged = true
+          break
+        end
+      end # convergence tests
+    end # inner loop
+    iterCount += 1
+  end # outer loop
+  return par, info_, f_calls, j_calls
 end

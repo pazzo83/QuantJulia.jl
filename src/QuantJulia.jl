@@ -112,13 +112,13 @@ export
     ConstantParameter, G2FittingParameter, HullWhiteFittingParameter,
 
     # models/calibration_helpers.jl
-    SwaptionHelper, add_times_to!,
+    SwaptionHelper, implied_volatility!, add_times_to!, model_value!,
 
     # models/short_rate.jl
-    PrivateConstraint, G2, HulLWhite, test, calibrate!, 
+    PrivateConstraint, G2, HullWhite, test, calibrate!, func_values, value, get_params,
 
     # pricing_engines/pricing_engines.jl
-    DiscountingBondEngine, DiscountingSwapEngine, G2SwaptionEngine, calculate
+    DiscountingBondEngine, DiscountingSwapEngine, G2SwaptionEngine, JamshidianSwaptionEngine, calculate
 
 # abstract types
 include("abstract_types.jl")

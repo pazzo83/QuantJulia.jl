@@ -185,7 +185,6 @@ function minimize!(lm::LevenbergMarquardt, p::Problem, endCriteria::EndCriteria)
     initJacobin = zeros(m, n)
     get_jacobin!(p.costFunction, initJacobin, x)
   end
-  xx = copy(x)
   fvec = zeros(m)
   diag_ = zeros(n)
   mode = 1
@@ -200,44 +199,49 @@ function minimize!(lm::LevenbergMarquardt, p::Problem, endCriteria::EndCriteria)
   wa1 = zeros(n)
   wa2 = zeros(n)
   wa3 = zeros(n)
-  wa4 = zeros(n)
+  wa4 = zeros(m)
 
-  function fcn!{I <: Integer}(::I, n::I, x::Vector{Float64}, fvec::Vector{Float64})
-    xt = x[1:n]
+  function fcn!{I <: Integer}(::I, n::I, _x::Vector{Float64}, _fvec::Vector{Float64})
+    xt = _x[1:n]
 
     if test(p.constraint, xt)
       tmp = values!(p, xt)
-      fvec[1:n] = tmp
+      _fvec[1:length(tmp)] = tmp
     else
-      fvec = copy(initCostValues)
+      _fvec = copy(initCostValues)
     end
 
-    return fvec
+    return _fvec
   end
 
   # function jacFcn!{I <: Integer}(m::I, n::I, x::Float64, fjac::Float64, ::I)
   #   xt = fill(x + n, n)
   # end
 
-  function fcn2(x::Vector{Float64})
-    if test(p.constraint, x)
-      fvec = values!(p, x)
-    else
-      fvec = copy(initCostValues)
-    end
-
-    return fvec
-  end
+  # function fcn2(x::Vector{Float64})
+  #   if test(p.constraint, x)
+  #     fvec = values!(p, x)
+  #   else
+  #     fvec = copy(initCostValues)
+  #   end
+  #
+  #   return fvec
+  # end
 
   # jacFcn! = Calculus.jacobian(fcn2)
 
   # TODO check requirements, see levenbergmarquardt.cpp
-  # lmdif!(m, n, xx, fvec, endCriteria.functionEpsilon, lm.xtol, lm.gtol, endCriteria.maxIterations, lm.epsfcn, diag_, mode, factor_, nprint, info_, nfev, fjac, ldfjac,
-  #     ipvt, qtf, wa1, wa2, wa3, wa4, fcn!)
+  lmdif!(m, n, x, fvec, endCriteria.functionEpsilon, lm.xtol, lm.gtol, endCriteria.maxIterations, lm.epsfcn, diag_, mode, factor_, nprint, info_, nfev, fjac, ldfjac,
+      ipvt, qtf, wa1, wa2, wa3, wa4, fcn!)
 
-  lmdif2!(n, m, x, mode, factor_, info_, lm.epsfcn, fcn!)
+  # lmdif2!(n, m, x, mode, factor_, info_, lm.epsfcn, endCriteria.functionEpsilon, lm.xtol, lm.gtol, endCriteria.maxIterations, fcn!)
+  # println(x)
   # res = lmfit(fcn2, xx, endCriteria.maxIterations)
 
+  # current value is already set
+  p.functionValue = QuantJulia.value(p.costFunction, x)
+
+  return p
 end
 
 ## SIMPLEX METHODS ##
