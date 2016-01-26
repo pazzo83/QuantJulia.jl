@@ -208,6 +208,18 @@ function operator(pricingFunc::G2SwaptionPricingFunction)
   return _inner
 end
 
+## ONE FACTOR MODELS ##
+type OneFactorShortRateTree{S <: ShortRateDynamics} <: ShortRateTree
+  tree::TrinomialTree
+  dynamics::S
+  treeLattice::TreeLattice1D
+end
+
+OneFactorShortRateTree{S <: ShortRateDynamics}(tree::TrinomialTree, dynamics::S, tg::TimeGrid) =
+                      OneFactorShortRateTree(tree, dynamics, TreeLattice1D(timeGrid, get_size(tree, 1)))
+
+get_size{I <: Integer}(tr::OneFactorShortRateTree, i::I) = get_size(tr.tree, i)
+
 type HullWhite{T <: TermStructure} <: ShortRateModel
   r0::Float64
   a::ConstantParameter
@@ -230,9 +242,45 @@ function HullWhite{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 =
   return HullWhite(r0, a_const, sigma_const, phi, ts, privateConstraint)
 end
 
+type HullWhiteDynamics{P <: Parameter} <: ShortRateDynamics
+  process::OrnsteinUhlenbeckProcess
+  fitting::P
+  a::Float64
+  sigma::Float64
+end
+
+HullWhiteDynamics{P <: Parameter}(fitting::P, a::Float64, sigma::Float64) = HullWhiteDynamics(fitting, a, sigma, OrnsteinUhlenbeckProcess(a, sigma))
+
 get_params(m::HullWhite) = Float64[get_a(m), get_sigma(m)]
 
 generate_arguments!(m::HullWhite) = m.phi = HullWhiteFittingParameter(get_a(m), get_sigma(m), m.ts)
+
+function tree(model::HullWhite, grid::TimeGrid)
+  phi = TermStructureFittingParameter(model.ts)
+  numericDynamics = HullWhiteDynamics(phi, get_a(model), get_sigma(model))
+  trinomial = TrinomialTree(numericDynamics.process, grid)
+  numericTree = OneFactorShortRateTree(trinomial, numericDynamics, grid)
+
+  reset_param_impl!(phi)
+
+  for i = 1:length(grid.times)
+    discountBond = discount(model.ts, grid.times[i + 1])
+    statePrices = numericTree.getStatePrices(i)
+    sz = get_size(numericTree, i - 1)
+    dt = grid.dt[i]
+    dx = trinomial.dx[i]
+    x = get_underlying(trinomial, i, 0)
+    val = 0.0
+    for j = 1:sz
+      val += statePrices[j] * exp(-x * dt)
+      x += dx
+    end
+    val = log(val / discountBond) / dt
+    set_params!(phi, grid.times[i], val)
+  end
+
+  return numericTree
+end
 
 type RStarFinder{M <: ShortRateModel}
   model::M

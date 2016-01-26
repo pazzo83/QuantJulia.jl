@@ -1,6 +1,14 @@
 # Lazy Object
 abstract LazyObject
 
+# Process
+abstract StochasticProcess
+abstract StochasticProcess1D <: StochasticProcess
+
+# Methods
+abstract Lattice
+abstract TreeLattice <: Lattice
+
 # Exercise
 abstract Exercise
 abstract EarlyExercise <: Exercise
@@ -52,6 +60,8 @@ abstract Parameter
 abstract CalibrationErrorType
 abstract CalibrationHelper <: LazyObject
 abstract ShortRateModel
+abstract ShortRateDynamics
+abstract ShortRateTree
 
 # Currencies
 abstract AbstractCurrency
