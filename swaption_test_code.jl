@@ -83,23 +83,30 @@ function main()
   # models
   modelG2 = G2(rhTermStructure)
   hullWhiteModel = HullWhite(rhTermStructure)
+  hullWhiteModel2 = HullWhite(rhTermStructure)
+
+  # for swaptionHelper in swaptions
+  #   swaptionHelper.pricingEngine = G2SwaptionEngine(modelG2, 6.0, 16)
+  # end
+  #
+  # calibrate_model(modelG2, swaptions)
+  # println("calibrated to: ")
+  # println(@sprintf("a = %.6f, sigma = %.6f", get_params(modelG2)[1], get_params(modelG2)[2]))
+  # println(@sprintf("b = %.6f, eta = %.6f", get_params(modelG2)[3], get_params(modelG2)[4]))
+  # println(@sprintf("rho = %.6f", get_params(modelG2)[5]))
+  #
+  # # Hull White
+  # for swaptionHelper in swaptions
+  #   update_pricing_engine!(swaptionHelper, JamshidianSwaptionEngine(hullWhiteModel))
+  # end
+  #
+  # calibrate_model(hullWhiteModel, swaptions)
+  # println("calibrated to: ")
+  # println(@sprintf("a = %.6f, sigma = %.6f", get_params(hullWhiteModel)[1], get_params(hullWhiteModel)[2]))
 
   for swaptionHelper in swaptions
-    swaptionHelper.pricingEngine = G2SwaptionEngine(modelG2, 6.0, 16)
+    swaptionHelper.pricingEngine = TreeSwaptionEngine(hullWhiteModel2, tg)
   end
 
-  calibrate_model(modelG2, swaptions)
-  println("calibrated to: ")
-  println(@sprintf("a = %.6f, sigma = %.6f", get_params(modelG2)[1], get_params(modelG2)[2]))
-  println(@sprintf("b = %.6f, eta = %.6f", get_params(modelG2)[3], get_params(modelG2)[4]))
-  println(@sprintf("rho = %.6f", get_params(modelG2)[5]))
-
-  # Hull White
-  for swaptionHelper in swaptions
-    update_pricing_engine!(swaptionHelper, JamshidianSwaptionEngine(hullWhiteModel))
-  end
-
-  calibrate_model(hullWhiteModel, swaptions)
-  println("calibrated to: ")
-  println(@sprintf("a = %.6f, sigma = %.6f", get_params(hullWhiteModel)[1], get_params(hullWhiteModel)[2]))
+  return swaptions[4]
 end

@@ -40,6 +40,14 @@ export
     # lazy.jl
     LazyMixin, calculate!, recalculate!,
 
+    # Process
+    # process/stochastic_process/jl
+    OrnsteinUhlenbeckProcess, expectation, variance,
+
+    # Methods
+    # methods/lattice.jl
+    TreeLattice1D, Branching, TrinomialTree,
+
     # quotes/Quotes.jl
     Quote,
 
@@ -118,13 +126,19 @@ export
     PrivateConstraint, G2, HullWhite, test, calibrate!, func_values, value, get_params,
 
     # pricing_engines/pricing_engines.jl
-    DiscountingBondEngine, DiscountingSwapEngine, G2SwaptionEngine, JamshidianSwaptionEngine, calculate
+    DiscountingBondEngine, DiscountingSwapEngine, G2SwaptionEngine, JamshidianSwaptionEngine, TreeSwaptionEngine, calculate
 
 # abstract types
 include("abstract_types.jl")
 
 # lazy
 include("lazy.jl")
+
+# process
+include("process/stochastic_process.jl")
+
+# methods
+include("methods/lattice.jl")
 
 # Quotes ----------------------------
 include("quotes/Quotes.jl")

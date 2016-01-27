@@ -47,7 +47,7 @@ type G2SwaptionEngine{Y <: YieldTermStructure, I <: Integer} <: PricingEngine{Y}
 end
 
 type JamshidianSwaptionEngine{S <: ShortRateModel, Y <: YieldTermStructure} <: PricingEngine{Y}
-  model::ShortRateModel
+  model::S
   ts::Y
 
   function call{S}(::Type{JamshidianSwaptionEngine}, model::S)
@@ -57,6 +57,24 @@ type JamshidianSwaptionEngine{S <: ShortRateModel, Y <: YieldTermStructure} <: P
   function call{S, Y}(::Type{JamshidianSwaptionEngine}, model::S, yts::Y)
     new{S, Y}(model, yts)
   end
+end
+
+type TreeSwaptionEngine{S <: ShortRateModel, I <: Integer, T <: ShortRateTree, Y <: YieldTermStructure} <: LatticeShortRateModelEngine{S, Y, T}
+  model::S
+  timeSteps::I
+  tg::TimeGrid
+  lattice::T
+  ts::Y
+
+  call{S, I, T}(::Type{TreeSwaptionEngine}, m::S, tsteps::I, tg::TimeGrid, l::T) = new{S, I, T, YieldTermStructure}(m, tsteps, tg, l)
+
+  call{S, I, T, Y}(::Type{TreeSwaptionEngine}, m::S, tsteps::I, tg::TimeGrid, l::T, ts::Y) = new{S, I, T, Y}(m, tsteps, tg, l, ts)
+end
+
+function TreeSwaptionEngine{S <: ShortRateModel}(model::S, tg::TimeGrid)
+  lattice = tree(model, tg)
+
+  return TreeSwaptionEngine(model, 0, tg, lattice)
 end
 
 type DiscretizedSwap <: DiscretizedAsset

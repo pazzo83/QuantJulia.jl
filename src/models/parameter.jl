@@ -1,3 +1,5 @@
+operator{P <: Parameter}(param::P, t::Float64) = value(param, t)
+
 type ConstantParameter <: Parameter
   data::Vector{Float64}
   constraint::Constraint
@@ -40,6 +42,10 @@ function set_params!(param::TermStructureFittingParameter, tm::Float64, val::Flo
   return param
 end
 
+function value(param::TermStructureFittingParameter, t::Float64)
+  idx = findfirst(param.times, t)
+  return param.values[idx]
+end
 
 NullParameter{P <: DataType}(_type::P) = _type([0.0], NoConstraint())
 

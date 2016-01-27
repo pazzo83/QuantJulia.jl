@@ -43,6 +43,7 @@ abstract RateHelper <: BootstrapHelper
 abstract PricingEngine{Y}
 abstract DiscretizedAsset
 abstract DiscretizedOption <: DiscretizedAsset
+abstract LatticeShortRateModelEngine{S, Y, T} <: PricingEngine{Y}
 
 # Cash Flows
 abstract CashFlows

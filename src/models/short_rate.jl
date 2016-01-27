@@ -212,13 +212,29 @@ end
 type OneFactorShortRateTree{S <: ShortRateDynamics} <: ShortRateTree
   tree::TrinomialTree
   dynamics::S
+  tg::TimeGrid
   treeLattice::TreeLattice1D
+
+  function OneFactorShortRateTree{S}(tree::TrinomialTree, dynamics::S, tg::TimeGrid)
+    oneFactorTree = new(tree, dynamics, tg)
+    oneFactorTree.treeLattice = TreeLattice1D(tg, get_size(tree, 2), oneFactorTree)
+
+    return oneFactorTree
+  end
 end
 
-OneFactorShortRateTree{S <: ShortRateDynamics}(tree::TrinomialTree, dynamics::S, tg::TimeGrid) =
-                      OneFactorShortRateTree(tree, dynamics, TreeLattice1D(timeGrid, get_size(tree, 1)))
-
 get_size{I <: Integer}(tr::OneFactorShortRateTree, i::I) = get_size(tr.tree, i)
+
+get_state_prices!(tree::OneFactorShortRateTree, i::Int) = get_state_prices!(tree.treeLattice, i)
+
+function discount(tr::OneFactorShortRateTree, i::Int, idx::Int)
+  x = get_underlying(tr.tree, i, idx)
+  r = short_rate(tr.dynamics, tr.tg.times[i], x)
+  return exp(-r * tr.tg.dt[i])
+end
+
+descendant(tr::OneFactorShortRateTree, i::Int, idx::Int, branch::Int) = descendant(tr.tree, i, idx, branch)
+probability(tr::OneFactorShortRateTree, i::Int, idx::Int, branch::Int) = probability(tr.tree, i, idx, branch)
 
 type HullWhite{T <: TermStructure} <: ShortRateModel
   r0::Float64
@@ -249,7 +265,9 @@ type HullWhiteDynamics{P <: Parameter} <: ShortRateDynamics
   sigma::Float64
 end
 
-HullWhiteDynamics{P <: Parameter}(fitting::P, a::Float64, sigma::Float64) = HullWhiteDynamics(fitting, a, sigma, OrnsteinUhlenbeckProcess(a, sigma))
+HullWhiteDynamics{P <: Parameter}(fitting::P, a::Float64, sigma::Float64) = HullWhiteDynamics(OrnsteinUhlenbeckProcess(a, sigma), fitting, a, sigma)
+
+short_rate(dynamic::HullWhiteDynamics, t::Float64, x::Float64) = x + operator(dynamic.fitting, t)
 
 get_params(m::HullWhite) = Float64[get_a(m), get_sigma(m)]
 
@@ -259,17 +277,17 @@ function tree(model::HullWhite, grid::TimeGrid)
   phi = TermStructureFittingParameter(model.ts)
   numericDynamics = HullWhiteDynamics(phi, get_a(model), get_sigma(model))
   trinomial = TrinomialTree(numericDynamics.process, grid)
-  numericTree = OneFactorShortRateTree(trinomial, numericDynamics, grid)
+  numericTree = OneFactorShortRateTree{HullWhiteDynamics}(trinomial, numericDynamics, grid)
 
   reset_param_impl!(phi)
 
-  for i = 1:length(grid.times)
+  for i = 1:length(grid.times) - 1
     discountBond = discount(model.ts, grid.times[i + 1])
-    statePrices = numericTree.getStatePrices(i)
-    sz = get_size(numericTree, i - 1)
+    statePrices = get_state_prices!(numericTree, i)
+    sz = get_size(numericTree, i)
     dt = grid.dt[i]
     dx = trinomial.dx[i]
-    x = get_underlying(trinomial, i, 0)
+    x = get_underlying(trinomial, i, 1)
     val = 0.0
     for j = 1:sz
       val += statePrices[j] * exp(-x * dt)

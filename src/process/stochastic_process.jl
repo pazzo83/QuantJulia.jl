@@ -3,9 +3,11 @@ type OrnsteinUhlenbeckProcess <: StochasticProcess1D
   vol::Float64
   x0::Float64
   level::Float64
+
+  OrnsteinUhlenbeckProcess(speed::Float64, vol::Float64, x0::Float64 = 0.0, level::Float64 = 0.0) = new(speed, vol, x0, level)
 end
 
-OrnsteinUhlenbeckProcess(speed::Float64, vol::Float64, x0::Float64 = 0.0, level::Float64 = 0.0) = OrnsteinUhlenbeckProcess(speed, vol, x0, level)
+expectation(process::OrnsteinUhlenbeckProcess, ::Float64, x0::Float64, dt::Float64) = process.level + (x0 - process.level) * exp(-process.speed * dt)
 
 function variance(process::OrnsteinUhlenbeckProcess, ::Float64, ::Float64, dt::Float64)
   v = process.vol
