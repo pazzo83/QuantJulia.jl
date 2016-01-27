@@ -29,22 +29,6 @@ end
 FiniteDifferenceNewtonSafe{I <: Integer}(maxEvals::I = 100, lowerBoundEnforced::Bool = false, upperBoundEnforced::Bool = false, lowerBound::Float64 = 0.0, upperBound::Float64 = 0.0) =
   FiniteDifferenceNewtonSafe(SolverInfo(maxEvals, lowerBoundEnforced, upperBoundEnforced, lowerBound, upperBound))
 
-# misc functions for solving
-function is_close(x::Float64, y::Float64, n::Int64 = 42)
-  if x == y
-    return true
-  end
-
-  diff = abs(x - y)
-  tol = n * eps(Float64) # machine epsilon
-
-  if (x * y == 0.0) # x or y is 0
-    return diff < (tol * tol)
-  end
-
-  return diff <= tol * abs(x) && diff <= tol * abs(y)
-end
-
 # solver functions
 function solve{S <: Solver1D}(solver::S, f::Function, accuracy::Float64, guess::Float64, step::Float64)
   ## This method returns the 0 of a function determined by a given accuracy.  This method using bracketing

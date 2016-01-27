@@ -1,4 +1,4 @@
-using QuantJulia.Time
+using QuantJulia.Time, QuantJulia.Math
 
 type TreeLattice1D{T, I <: Integer} <: TreeLattice
   tg::TimeGrid
@@ -40,6 +40,61 @@ function compute_state_prices!(t::TreeLattice1D, until::Int)
   t.statePricesLimit = until
 
   return t
+end
+
+function initialize!(lattice::TreeLattice, asset::DiscretizedAsset, t::Float64)
+  i = findfirst(lattice.tg.times .>= t)
+  set_time!(asset, t)
+  reset!(asset, get_size(lattice.impl, i))
+end
+
+function rollback!(lattice::TreeLattice, asset::DiscretizedAsset, t::Float64)
+  partial_rollback!(lattice, asset, t)
+  adjust_values!(asset)
+
+  return asset
+end
+
+function partial_rollback!(lattice::TreeLattice, asset::DiscretizedAsset, t::Float64)
+  from = asset.common.time
+
+  if QuantJulia.Math.is_close(from, t)
+    return
+  end
+
+  iFrom = findfirst(lattice.tg.times .>= from)
+  iTo = findfirst(lattice.tg.times .>= t)
+
+  for i = iFrom-1:-1:iTo
+    newVals = zeros(get_size(lattice.impl, i))
+    step_back!(lattice, i, asset.common.values, newVals)
+    asset.common.time = lattice.tg.times[i]
+    asset.common.values = newVals
+    if i != iTo
+      adjust_values!(asset)
+    end
+  end
+
+  return asset
+end
+
+function present_value(lattice::TreeLattice, asset::DiscretizedAsset)
+  i = findfirst(lattice.tg.times .>= asset.common.time)
+  return dot(asset.common.values, lattice.statePrices[i])
+end
+
+function step_back!(lattice::TreeLattice, i::Int, vals::Vector{Float64}, newVals::Vector{Float64})
+  # pragma omp parallel for
+  for j = 1:get_size(lattice.impl, i)
+    val = 0.0
+    for l = 1:lattice.n
+      val += probability(lattice.impl, i, j, l) * vals[descendant(lattice.impl, i, j, l)]
+    end
+    val += discount(lattice.impl, i, j)
+    newVals[j] = val
+  end
+
+  return newVals
 end
 
 type Branching{I <: Integer}

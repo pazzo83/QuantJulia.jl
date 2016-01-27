@@ -8,6 +8,37 @@ type Derivative <: FunctionType end
 
 type BernsteinPolynomial end
 
+# misc function for comparison
+function is_close{T <: Number}(x::T, y::T, n::Int = 42)
+  if x == y
+    return true
+  end
+
+  diff = abs(x - y)
+  tol = n * eps(Float64) # machine epsilon
+
+  if (x * y == 0.0) # x or y is 0
+    return diff < (tol * tol)
+  end
+
+  return diff <= tol * abs(x) && diff <= tol * abs(y)
+end
+
+function close_enough{T <: Number}(x::T, y::T, n::Int = 42)
+  if x == y
+    return true
+  end
+
+  diff = abs(x -y)
+  tol = n * eps()
+
+  if x * y == 0
+    return diff < (tol * tol)
+  end
+
+  return diff <= tol * abs(x) || diff <= tol * abs(y)
+end
+
 # misc functions - prob put in own file
 function divide_array_by_self!{T, N <: Number}(a::Vector{T}, x::N)
   for i = 1:length(a)
@@ -39,7 +70,7 @@ function get_polynomial{I <: Integer}(::BernsteinPolynomial, i::I, n::I, x::Floa
   return coeff * (x ^ i) * (1.0 - x)^(n - i)
 end
 
-export divide_array_by_self!, multiply_array_by_self!, get_factorial, get_polynomial, FunctionType, Derivative, BernsteinPolynomial
+export is_close, close_enough, divide_array_by_self!, multiply_array_by_self!, get_factorial, get_polynomial, FunctionType, Derivative, BernsteinPolynomial
 
 # Splines
 type BSpline

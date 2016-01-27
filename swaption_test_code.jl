@@ -108,5 +108,6 @@ function main()
     swaptionHelper.pricingEngine = TreeSwaptionEngine(hullWhiteModel2, tg)
   end
 
-  return swaptions[4]
+  calibrate_model(hullWhiteModel2, swaptions)
+
 end
