@@ -306,20 +306,20 @@ function tree(model::HullWhite, grid::TimeGrid)
 
   reset_param_impl!(phi)
 
-  for i = 1:length(grid.times) - 1
-    discountBond = discount(model.ts, grid.times[i + 1])
+  @simd for i = 1:length(grid.times) - 1
+    @inbounds discountBond = discount(model.ts, grid.times[i + 1])
     statePrices = get_state_prices!(numericTree, i)
     sz = get_size(numericTree, i)
-    dt = grid.dt[i]
-    dx = trinomial.dx[i]
+    @inbounds dt = grid.dt[i]
+    @inbounds dx = trinomial.dx[i]
     x = get_underlying(trinomial, i, 1)
     val = 0.0
     for j = 1:sz
-      val += statePrices[j] * exp(-x * dt)
+      @inbounds val += statePrices[j] * exp(-x * dt)
       x += dx
     end
     val = log(val / discountBond) / dt
-    set_params!(phi, grid.times[i], val)
+    @inbounds set_params!(phi, grid.times[i], val)
   end
 
   return numericTree

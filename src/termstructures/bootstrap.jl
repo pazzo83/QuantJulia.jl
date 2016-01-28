@@ -98,7 +98,7 @@ end
 function _calculate!{T <: TermStructure}(boot::IterativeBootstrap, ts::T)
   max_iter = max_iterations(ts.trait)
   valid_data = ts.validCurve
-  
+
   iterations = 0
   # if we get through this loop, we haven't converged
   while iterations < max_iter
@@ -119,7 +119,7 @@ function _calculate!{T <: TermStructure}(boot::IterativeBootstrap, ts::T)
 
       if !valid_data
         update_idx = i == length(ts.data) ? 1 : i + 1
-        update!(ts.interp, update_idx, ts.data[1])
+        QuantJulia.Math.update!(ts.interp, update_idx, ts.data[1])
       end
 
       # put this in a try / catch
@@ -153,7 +153,7 @@ function bootstrap_error{I <: Integer, T <: BootstrapHelper, Y <: YieldTermStruc
   function bootstrap_error_inner(g::Float64)
     # update trait
     update_guess!(ts.trait, i, ts, g)
-    update!(ts.interp, i, g)
+    QuantJulia.Math.update!(ts.interp, i, g)
     # qe =
     # if i > 7
     #   println("GUESS: $i : $g")

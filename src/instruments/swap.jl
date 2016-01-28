@@ -37,7 +37,8 @@ function VanillaSwapArgs{L <: Leg}(legs::Vector{L})
   fixedCoups = legs[1].coupons
   floatingCoups = legs[2].coupons
   fixedCoupons = [amount(coup) for coup in fixedCoups]
-  floatingCoupons = [amount(coup) for coup in floatingCoups]
+  # floatingCoupons = [amount(coup) for coup in floatingCoups]
+  floatingCoupons = zeros(length(floatingCoups))
   floatingAccrualTimes = [accrual_period(coup) for coup in floatingCoups]
   floatingSpreads = [coup.spread for coup in floatingCoups]
   return VanillaSwapArgs(get_reset_dates(fixedCoups), get_pay_dates(fixedCoups), get_reset_dates(floatingCoups), get_pay_dates(floatingCoups), floatingAccrualTimes, floatingSpreads, fixedCoupons, floatingCoupons)
@@ -119,6 +120,7 @@ end
 # Calculation method #
 function perform_calculations!(swap::VanillaSwap)
   reset!(swap.results) # reset - TODO this will be expanded
+  swap.args.floatingCoupons = [amount(coup) for coup in swap.legs[2].coupons]
   _calculate!(swap.pricingEngine, swap)
 
   return swap

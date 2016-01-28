@@ -11,7 +11,7 @@ function enorm{I <: Integer}(n::I, x::Vector{Float64})
   agiant = rgiant / floatn
 
   for i = 1:n
-    xabs = abs(x[i])
+    @inbounds xabs = abs(x[i])
     if xabs > rdwarf && xabs < agiant
       # sum for intermediate components
       s2 += xabs * xabs
@@ -73,21 +73,21 @@ function fdjac2!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Floa
   temp  = max(epsfcn, MACHEP)
   eps_ = sqrt(temp)
   ij = 1
-  for j = 1:n
-    temp = x[j]
+  @simd for j = 1:n
+    @inbounds temp = x[j]
     h = eps_ * abs(temp)
     if h == 0.0
       h = eps_
     end
 
-    x[j] = temp + h
+    @inbounds x[j] = temp + h
     fcn!(m, n, x, wa)
     if iflag < 0
       return fjac
     end
-    x[j] = temp
+    @inbounds x[j] = temp
     for i = 1:m
-      fjac[ij] = (wa[i] - fvec[i]) / h
+      @inbounds fjac[ij] = (wa[i] - fvec[i]) / h
       ij += 1
     end
   end
@@ -115,12 +115,12 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
   #         with rdiag.
   # Compute the initial column norms and initialize several arrays
   ij = 1
-  for j = 1:n
-    acnorm[j] = enorm(m, a[:, ij])
-    rdiag[j] = acnorm[j]
-    wa[j] = rdiag[j]
+  @simd for j = 1:n
+    @inbounds acnorm[j] = enorm(m, a[:, ij])
+    @inbounds rdiag[j] = acnorm[j]
+    @inbounds wa[j] = rdiag[j]
     if pivot != 0
-      ipvt[j] = j
+      @inbounds ipvt[j] = j
     end
     ij += 1
   end
@@ -134,8 +134,8 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
 
     # bring the column of the largest norm into the pivot position
     kmax = j
-    for k = j:n
-      if rdiag[k] > rdiag[kmax]
+    @simd for k = j:n
+      @inbounds if rdiag[k] > rdiag[kmax]
         kmax = k
       end
     end
@@ -146,76 +146,76 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
     ij = (m * (j - 1)) + 1
     jj = (m * (kmax - 1)) + 1
 
-    for i = 1:m
-      temp = a[ij]
-      a[ij] = a[jj]
-      a[jj] = temp
+    @simd for i = 1:m
+      @inbounds temp = a[ij]
+      @inbounds a[ij] = a[jj]
+      @inbounds a[jj] = temp
       ij += 1
       jj += 1
     end
 
-    rdiag[kmax] = rdiag[j]
-    wa[kmax] = wa[j]
-    k = ipvt[j]
-    ipvt[j] = ipvt[kmax]
-    ipvt[kmax] = k
+    @inbounds rdiag[kmax] = rdiag[j]
+    @inbounds wa[kmax] = wa[j]
+    @inbounds k = ipvt[j]
+    @inbounds ipvt[j] = ipvt[kmax]
+    @inbounds ipvt[kmax] = k
 
     @label L40
     # Compute the householder transformation to reduce the j-th column of a to
     # a multiple of the j-th unit vector
     jj = j + m * (j - 1)
     # jj_end = jj + (m - j)
-    ajnorm = enorm(m - (j - 1), a[jj:end])
+    @inbounds ajnorm = enorm(m - (j - 1), a[jj:end])
     if ajnorm == 0.0
       @goto L100
     end
-    if a[jj] < 0.0
+    @inbounds if a[jj] < 0.0
       ajnorm = -ajnorm
     end
     ij = jj
 
-    for i = j:m
-      a[ij] /= ajnorm
+    @simd for i = j:m
+      @inbounds a[ij] /= ajnorm
       ij += 1
 
     end
 
-    a[jj] += 1.0
+    @inbounds a[jj] += 1.0
 
     # Apply the transformation to the remaining columns
     # and update the norms
     jp1 = j + 1
     if jp1 <= n
-      for k = jp1:n
+      @simd for k = jp1:n
         sum_ = 0.0
         ij = j + m * (k - 1)
         jj = j + m * (j - 1)
 
         for i = j:m
-          sum_ += a[jj] * a[ij]
+          @inbounds sum_ += a[jj] * a[ij]
           ij += 1
           jj += 1
         end
 
-        temp = sum_ / a[j + m * (j - 1)]
+        @inbounds temp = sum_ / a[j + m * (j - 1)]
         ij = j + m * (k - 1)
         jj = j + m * (j - 1)
         for i = j:m
-          a[ij] -= temp * a[jj]
+          @inbounds a[ij] -= temp * a[jj]
           ij += 1
           jj += 1
         end
 
         if pivot != 0 && rdiag[k] != 0.0
-          temp = a[j + m * (k - 1)]  / rdiag[k]
+          @inbounds temp = a[j + m * (k - 1)]  / rdiag[k]
           temp = max(0.0, 1.0 - temp * temp)
-          rdiag[k] *= sqrt(temp)
-          temp = rdiag[k]/wa[k]
+          @inbounds rdiag[k] *= sqrt(temp)
+          @inbounds temp = rdiag[k]/wa[k]
 
           if 0.05 * temp * temp <= MACHEP
             a_start = jp1 + m * (k - 1)
-            rdiag[k] = enorm(m - j, a[a_start:end])
-            wa[k] = rdiag[k]
+            @inbounds rdiag[k] = enorm(m - j, a[a_start:end])
+            @inbounds wa[k] = rdiag[k]
           end
         end
       end
@@ -223,7 +223,7 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
 
     @label L100
 
-    rdiag[j] = -ajnorm
+    @inbounds rdiag[j] = -ajnorm
   end
 
   return a, ipvt, rdiag, acnorm
@@ -234,29 +234,29 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
   # copy r and (q transpose) * b to preserve input and initialize s, in particular
   # save the diagonal elements of r in x
   kk = 1
-  for j = 1:n
+  @simd for j = 1:n
     ij = kk
     ik = kk
     for i = j:n
-      r[ij] = r[ik]
+      @inbounds r[ij] = r[ik]
       ij += 1
       ik += ldr
     end
-    x[j] = r[kk]
-    wa[j] = qtb[j]
+    @inbounds x[j] = r[kk]
+    @inbounds wa[j] = qtb[j]
     kk += ldr + 1
   end
 
   # eliminate the diagonal matrix d using a given rotation
   for j = 1:n
-    l = ipvt[j]
-    if diag_[l] == 0.0
+    @inbounds l = ipvt[j]
+    @inbounds if diag_[l] == 0.0
       @goto L90
     end
     for k = j:n
-      sdiag[k] = 0.0
+      @inbounds sdiag[k] = 0.0
     end
-    sdiag[j] = diag_[l]
+    @inbounds sdiag[j] = diag_[l]
 
     # transformations to eliminate the row of d, modify only a single element
     # of (q transpose) * b beyond the first n, which is initially zero
@@ -264,35 +264,35 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
     for k = j:n
       # determine a given rotation which elminates the appropriate element
       # in the current row of d
-      if sdiag[k] == 0.0
+      @inbounds if sdiag[k] == 0.0
         continue
       end
       kk = k + ldr * (k - 1)
-      if abs(r[kk]) < abs(sdiag[k])
-        cotan_ = r[kk] / sdiag[k]
+      @inbounds if abs(r[kk]) < abs(sdiag[k])
+        @inbounds cotan_ = r[kk] / sdiag[k]
         sin_ = 0.5 / sqrt(0.25 + 0.25 * cotan_ * cotan_)
         cos_ = sin_ * cotan_
       else
-        tan_ = sdiag[k] / r[kk]
+        @inbounds tan_ = sdiag[k] / r[kk]
         cos_ = 0.5 / sqrt(0.25 + 0.25 * tan_ * tan_)
         sin_ = cos_ * tan_
       end
 
       # compute the modified diagonal element of r and the modified element of
       # (q transpose) * b, 0
-      r[kk] = cos_ * r[kk] + sin_* sdiag[k]
-      temp = cos_ * wa[k] + sin_ * qtbpj
-      qtbpj = -sin_ * wa[k] + cos_ * qtbpj
-      wa[k] = temp
+      @inbounds r[kk] = cos_ * r[kk] + sin_* sdiag[k]
+      @inbounds temp = cos_ * wa[k] + sin_ * qtbpj
+      @inbounds qtbpj = -sin_ * wa[k] + cos_ * qtbpj
+      @inbounds wa[k] = temp
 
       # accumulate the transformation of the row s
       kp1 = k + 1
       if n >= kp1
         ik = kk + 1
         for i = kp1:n
-          temp = cos_ * r[ik] + sin_ * sdiag[i]
-          sdiag[i] = -sin_ * r[ik] + cos_ * sdiag[i]
-          r[ik] = temp
+          @inbounds temp = cos_ * r[ik] + sin_ * sdiag[i]
+          @inbounds sdiag[i] = -sin_ * r[ik] + cos_ * sdiag[i]
+          @inbounds r[ik] = temp
           ik += 1
         end
       end
@@ -303,20 +303,20 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
     # store the diagonal element of s and restore the corresponding diagonal
     # element of r
     kk = j + ldr * (j - 1)
-    sdiag[j] = r[kk]
-    r[kk] = x[j]
+    @inbounds sdiag[j] = r[kk]
+    @inbounds r[kk] = x[j]
   end
 
   # Solve the triangular system for z, if the system is singular, then obtain
   # a least squares solution
   nsing = n
-  for j = 1:n
-    if sdiag[j] == 0.0 && nsing == n
+  @simd for j = 1:n
+    @inbounds if sdiag[j] == 0.0 && nsing == n
       nsing = j - 1
     end
 
     if nsing < n
-      wa[j] = 0.0
+      @inbounds wa[j] = 0.0
     end
   end
 
@@ -324,25 +324,25 @@ function qrsolv!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::Int, ipvt::Vector{
     @goto L150
   end
 
-  for k = 1:nsing
+  @simd for k = 1:nsing
     j = nsing - k + 1
     sum_ = 0.0
     jp1 = j + 1
     if nsing >= jp1
       ij = jp1 + ldr * (j - 1)
       for i = jp1:nsing
-        sum_ += r[ij] * wa[i]
+        @inbounds sum_ += r[ij] * wa[i]
         ij += 1
       end
     end
-    wa[j] = (wa[j] - sum_) / sdiag[j]
+    @inbounds wa[j] = (wa[j] - sum_) / sdiag[j]
   end
 
   @label L150
   # permute the components of z back to components of x
-  for j = 1:n
+  @simd for j = 1:n
     # l = ipvt[j]
-    x[ipvt[j]] = wa[j]
+    @inbounds x[ipvt[j]] = wa[j]
   end
 
   return r, x, sdiag
@@ -356,44 +356,44 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
 
   nsing = n
   jj = 1
-  for j=1:n
-    wa1[j] = qtb[j]
-    if r[jj] == 0.0 && nsing == n
+  @simd for j=1:n
+    @inbounds wa1[j] = qtb[j]
+    @inbounds if r[jj] == 0.0 && nsing == n
       nsing = j - 1
     end
     if nsing < n
-      wa1[j] = 0.0
+      @inbounds wa1[j] = 0.0
     end
 
     jj += ldr + 1
   end
 
   if nsing >= 1
-    for k = 1:nsing
+    @simd for k = 1:nsing
       j = nsing - k + 1
-      wa1[j] = wa1[j] / r[j + ldr * (j - 1)]
-      temp = wa1[j]
+      @inbounds wa1[j] = wa1[j] / r[j + ldr * (j - 1)]
+      @inbounds temp = wa1[j]
       jm1 = j - 1
       if jm1 > 0
         ij = ldr * (j - 1) + 1
         for i = 1:jm1 + 1
-          wa1[i] -= r[ij] * temp
+          @inbounds wa1[i] -= r[ij] * temp
           ij += 1
         end
       end
     end
   end
 
-  for j = 1:n
-    l = ipvt[j]
-    x[l] = wa1[j]
+  @simd for j = 1:n
+    @inbounds l = ipvt[j]
+    @inbounds x[l] = wa1[j]
   end
 
   # initialize the iteration counter, evaluate the function at the origin
   # and test for acceptance of the gauss-newton direction
   iter = 0
-  for j = 1:n
-    wa2[j] = diag_[j] * x[j]
+  @simd for j = 1:n
+    @inbounds wa2[j] = diag_[j] * x[j]
   end
 
   dxnorm = enorm(n, wa2)
@@ -405,22 +405,22 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
   # parl, for the zero of the function.  Otherwise set this bound to zero
   parl = 0.0
   if nsing >= n
-    for j = 1:n
-      l = ipvt[j]
-      wa1[l] = diag_[l] * (wa2[l] / dxnorm)
+    @simd for j = 1:n
+      @inbounds l = ipvt[j]
+      @inbounds wa1[l] = diag_[l] * (wa2[l] / dxnorm)
     end
     jj = 1
-    for j = 1:n
+    @simd for j = 1:n
       sum_ = 0.0
       jm1 = j - 1
       if jm1 >= 1
         ij = jj
         for i = 1:jm1 + 1
-          sum_ += r[ij] * wa1[i]
+          @inbounds sum_ += r[ij] * wa1[i]
           ij += 1
         end
       end
-      wa1[j] = (wa1[j] - sum_) / r[j + ldr * (j - 1)]
+      @inbounds wa1[j] = (wa1[j] - sum_) / r[j + ldr * (j - 1)]
       jj += ldr
     end
     temp = enorm(n, wa1)
@@ -428,15 +428,15 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
   end
 
   jj = 1
-  for j = 1:n
+  @simd for j = 1:n
     sum_ = 0.0
     ij = jj
     for i = 1:j
-      sum_ += r[ij] * qtb[i]
+      @inbounds sum_ += r[ij] * qtb[i]
       ij += 1
     end
-    l = ipvt[j]
-    wa1[j] = sum_ / diag_[l]
+    @inbounds l = ipvt[j]
+    @inbounds wa1[j] = sum_ / diag_[l]
     jj += ldr
   end
 
@@ -471,8 +471,8 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
 
   qrsolv!(n, r, ldr, ipvt, wa1, qtb, x, sdiag, wa2)
 
-  for j = 1:n
-    wa2[j] = diag_[j] * x[j]
+  @simd for j = 1:n
+    @inbounds wa2[j] = diag_[j] * x[j]
   end
 
   dxnorm = enorm(n, wa2)
@@ -485,20 +485,20 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
   (abs(fp) <= 0.1 * delta || (parl == 0.0 && fp <= temp && temp < 0.0) || iter == 10) && @goto L220
 
   # compute the newton correction
-  for j = 1:n
-    l = ipvt[j]
-    wa1[j] = diag_[l] * (wa2[l] / dxnorm)
+  @simd for j = 1:n
+    @inbounds l = ipvt[j]
+    @inbounds wa1[j] = diag_[l] * (wa2[l] / dxnorm)
   end
 
   jj = 1
-  for j = 1:n
-    wa1[j] = wa1[j] / sdiag[j]
-    temp = wa1[j]
+  @simd for j = 1:n
+    @inbounds wa1[j] = wa1[j] / sdiag[j]
+    @inbounds temp = wa1[j]
     jp1 = j + 1
     if jp1 <= n
       ij = jp1 + jj
       for i = jp1:n
-        wa1[i] -= r[ij] * temp
+        @inbounds wa1[i] -= r[ij] * temp
         ij += 1
       end
     end
@@ -546,7 +546,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
 
   if mode == 2
     for j = 1:n
-      if diag_[j] <= 0.0
+      @inbounds if diag_[j] <= 0.0
         @goto L300
       end
     end
@@ -608,18 +608,18 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   # of the columns in the initial jacobin
   if iter == 1
     if mode != 2
-      for j = 1:n
-        diag_[j] = wa2[j]
+      @simd for j = 1:n
+        @inbounds diag_[j] = wa2[j]
         if wa2[j] == 0.0
-          diag_[j] = 1.0
+          @inbounds diag_[j] = 1.0
         end
       end
     end
 
     # on the first iteration, calculate the norm of the scaled x and initialize
     # the step bound delta
-    for j = 1:n
-      wa3[j] = diag_[j] * x[j]
+    @simd for j = 1:n
+      @inbounds wa3[j] = diag_[j] * x[j]
     end
 
     xnorm = enorm(n, wa3)
@@ -631,30 +631,30 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   end
 
   # form (q transpose) * fvec and store the first n components in qtf
-  for i = 1:m
-    wa4[i] = fvec[i]
+  @simd for i = 1:m
+    @inbounds wa4[i] = fvec[i]
   end
 
   jj = 1
-  for j = 1:n
-    temp3 = fjac[jj]
+  @simd for j = 1:n
+    @inbounds temp3 = fjac[jj]
     if temp3 != 0.0
       sum_ = 0.0
       ij = jj
       for i = j:m
-        sum_ += fjac[ij] * wa4[i]
+        @inbounds sum_ += fjac[ij] * wa4[i]
         ij += 1
       end
       temp = -sum_ / temp3
       ij = jj
       for i = j:m
-        wa4[i] += fjac[ij] * temp
+        @inbounds wa4[i] += fjac[ij] * temp
         ij += 1
       end
     end
-    fjac[jj] = wa1[j]
+    @inbounds fjac[jj] = wa1[j]
     jj += m + 1
-    qtf[j] = wa4[j]
+    @inbounds qtf[j] = wa4[j]
   end
 
 
@@ -669,16 +669,16 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   gnorm = 0.0
   if fnorm != 0.0
     jj = 1
-    for j = 1:n
-      l = ipvt[j]
-      if wa2[l] != 0.0
+    @simd for j = 1:n
+      @inbounds l = ipvt[j]
+      @inbounds if wa2[l] != 0.0
         sum_ = 0.0
         ij = jj
         for i = 1:j
-          sum_ += fjac[ij] * (qtf[i] / fnorm)
+          @inbounds sum_ += fjac[ij] * (qtf[i] / fnorm)
           ij += 1
         end
-        gnorm = max(gnorm, abs(sum_ / wa2[l]))
+        @inbounds gnorm = max(gnorm, abs(sum_ / wa2[l]))
       end
       jj += m
     end
@@ -695,8 +695,8 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
 
   # rescale if necessary
   if mode != 2
-    for j = 1:n
-      diag_[j] = max(diag_[j], wa2[j])
+    @simd for j = 1:n
+      @inbounds diag_[j] = max(diag_[j], wa2[j])
     end
   end
 
@@ -721,10 +721,10 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   # error("STOP")
 
   # store the direction of p and x + p, calculate the norm of p
-  for j = 1:n
-    wa1[j] = -wa1[j]
-    wa2[j] = x[j] + wa1[j]
-    wa3[j] = diag_[j] * wa1[j]
+  @simd for j = 1:n
+    @inbounds wa1[j] = -wa1[j]
+    @inbounds wa2[j] = x[j] + wa1[j]
+    @inbounds wa3[j] = diag_[j] * wa1[j]
   end
 
   pnorm = enorm(n, wa3)
@@ -758,13 +758,13 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
 
   # Compute the scaled predicted reduction and the scaled directional derivative
   jj = 1
-  for j = 1:n
-    wa3[j] = 0.0
-    l = ipvt[j]
-    temp = wa1[l]
+  @simd for j = 1:n
+    @inbounds wa3[j] = 0.0
+    @inbounds l = ipvt[j]
+    @inbounds temp = wa1[l]
     ij = jj
     for i = 1:j
-      wa3[i] += fjac[ij] * temp
+      @inbounds wa3[i] += fjac[ij] * temp
       ij += 1
     end
 
@@ -808,12 +808,12 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   end
   # test for successful iteration
   if ratio >= 0.0001
-    for j = 1:n
-      x[j] = wa2[j]
-      wa2[j] = diag_[j] * x[j]
+    @simd for j = 1:n
+      @inbounds x[j] = wa2[j]
+      @inbounds wa2[j] = diag_[j] * x[j]
     end
-    for i = 1:m
-      fvec[i] = wa4[i]
+    @simd for i = 1:m
+      @inbounds fvec[i] = wa4[i]
     end
 
     xnorm = enorm(n, wa2)

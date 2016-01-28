@@ -173,22 +173,22 @@ function DiscretizedSwaption{DC <: DayCount}(swaption::Swaption, referenceDate::
 
   # Date adjustments can get time vectors out of sync
   # Here we try and collapse similar dates which could cause a mispricing
-  for i = 1:n
-    exerciseDate = dates[i]
+  @simd for i = 1:n
+    @inbounds exerciseDate = dates[i]
 
     for j = 1:length(fixed_coups)
-      if within_next_week(exerciseDate, fixedPayDates[j]) && fixedResetDates[j] < referenceDate
-        fixedPayDates[j] = exerciseDate
+      @inbounds if within_next_week(exerciseDate, fixedPayDates[j]) && fixedResetDates[j] < referenceDate
+        @inbounds fixedPayDates[j] = exerciseDate
       end
 
-      if within_previous_week(exerciseDate, fixedResetDates[j])
-        fixedResetDates[j] = exerciseDate
+      @inbounds if within_previous_week(exerciseDate, fixedResetDates[j])
+        @inbounds fixedResetDates[j] = exerciseDate
       end
     end
 
     for j = 1:length(floating_coups)
-      if within_previous_week(exerciseDate, floatingResetDates[i])
-        floatingResetDates[j] = exerciseDate
+      @inbounds if within_previous_week(exerciseDate, floatingResetDates[i])
+        @inbounds floatingResetDates[j] = exerciseDate
       end
     end
   end
@@ -272,8 +272,8 @@ function post_adjust_values_impl!(dOption::DiscretizedOption)
       apply_exercise_condition!(dOption)
     end
   else
-    for i = 1:length(dOption.exerciseTimes)
-      t = dOption.exerciseTimes[i]
+    @simd for i = 1:length(dOption.exerciseTimes)
+      @inbounds t = dOption.exerciseTimes[i]
       if t >= 0.0 && is_on_time(dOption, t)
         apply_exercise_condition!(dOption)
       end
@@ -286,8 +286,8 @@ function post_adjust_values_impl!(dOption::DiscretizedOption)
 end
 
 function apply_exercise_condition!(dOption::DiscretizedOption)
-  for i = 1:length(dOption.common.values)
-    dOption.common.values[i] = max(dOption.underlying.common.values[i], dOption.common.values[i])
+  @simd for i = 1:length(dOption.common.values)
+    @inbounds dOption.common.values[i] = max(dOption.underlying.common.values[i], dOption.common.values[i])
   end
 
   return dOption
@@ -335,8 +335,8 @@ end
 
 function pre_adjust_values_impl!(dSwap::DiscretizedSwap)
   # Floating payments
-  for i = 1:length(dSwap.floatingResetTimes)
-    t = dSwap.floatingResetTimes[i]
+  @simd for i = 1:length(dSwap.floatingResetTimes)
+    @inbounds t = dSwap.floatingResetTimes[i]
     if t >= 0.0 && is_on_time(dSwap, t)
       bond = DiscretizedDiscountBond()
       initialize!(bond, dSwap.common.method, dSwap.floatingPayTimes[i])
@@ -348,33 +348,33 @@ function pre_adjust_values_impl!(dSwap::DiscretizedSwap)
 
       accruedSpread = nominal * T * spread
       for j = 1:length(dSwap.common.values)
-        coup = nominal * (1.0 - bond.common.values[j]) + accruedSpread * bond.common.values[j]
+        @inbounds coup = nominal * (1.0 - bond.common.values[j]) + accruedSpread * bond.common.values[j]
 
         if isa(dSwap.swapT, Payer)
-          dSwap.common.values[j] += coup
+          @inbounds dSwap.common.values[j] += coup
         else
-          dSwap.common.values[j] -= coup
+          @inbounds dSwap.common.values[j] -= coup
         end
       end
     end
   end
 
   # Fixed Payments
-  for i = 1:length(dSwap.fixedResetTimes)
+  @simd for i = 1:length(dSwap.fixedResetTimes)
     t = dSwap.fixedResetTimes[i]
     if t >= 0.0 && is_on_time(dSwap, t)
       bond = DiscretizedDiscountBond()
       initialize!(bond, dSwap.common.method, dSwap.fixedPayTimes[i])
       rollback!(bond, dSwap.common.time)
 
-      fixedCoup = dSwap.args.fixedCoupons[i]
+      @inbounds fixedCoup = dSwap.args.fixedCoupons[i]
 
       for j = 1:length(dSwap.common.values)
-        coup = fixedCoup * bond.common.values[j]
+        @inbounds coup = fixedCoup * bond.common.values[j]
         if isa(dSwap.swapT, Payer)
-          dSwap.common.values[j] -= coup
+          @inbounds dSwap.common.values[j] -= coup
         else
-          dSwap.common.values[j] += coup
+          @inbounds dSwap.common.values[j] += coup
         end
       end
     end
@@ -385,9 +385,9 @@ end
 
 function post_adjust_values_impl!(dSwap::DiscretizedSwap)
   # fixed coupons whose reset time is in the past won't be managed in pre_adjust_values
-  for i = 1:length(dSwap.fixedPayTimes)
-    t = dSwap.fixedPayTimes[i]
-    _reset = dSwap.fixedResetTimes[i]
+  @simd for i = 1:length(dSwap.fixedPayTimes)
+    @inbounds t = dSwap.fixedPayTimes[i]
+    @inbounds _reset = dSwap.fixedResetTimes[i]
     if t >= 0.0 && is_on_time(dSwap, t) && _reset < 0.0
       fixedCoup = dSwap.args.fixedCoupons[i]
       if isa(dSwap.swapT, Payer)
@@ -399,11 +399,11 @@ function post_adjust_values_impl!(dSwap::DiscretizedSwap)
   end
 
   # the same applies to floating payments whose rate is already fixed
-  for i = 1:length(dSwap.floatingPayTimes)
-    t = dSwap.floatingPayTimes[i]
-    _reset = dSwap.floatingResetTimes[i]
+  @simd for i = 1:length(dSwap.floatingPayTimes)
+    @inbounds t = dSwap.floatingPayTimes[i]
+    @inbounds _reset = dSwap.floatingResetTimes[i]
     if t >= 0.0 && is_on_time(dSwap, t) && _reset < 0.0
-      currentFloatingCoup = dSwap.args.floatingCoupons[i]
+      @inbounds currentFloatingCoup = dSwap.args.floatingCoupons[i]
 
       if isa(dSwap.swapT, Payer)
         dSwap.common.values += currentFloatingCoup
@@ -601,14 +601,14 @@ function _calculate!(pe::JamshidianSwaptionEngine, swaption::Swaption)
   val = 0.0
   _B = discount_bond(tsmodel, maturity, valueTime, rStar)
 
-  for i = 1:_size
-    fixedPayTime = year_fraction(dc, ref_date, swaption.swap.args.fixedPayDates[i])
+  @simd for i = 1:_size
+    @inbounds fixedPayTime = year_fraction(dc, ref_date, swaption.swap.args.fixedPayDates[i])
 
     strike = discount_bond(tsmodel, maturity, fixedPayTime, rStar) / _B
 
     dboValue = discount_bond_option(tsmodel, w, strike, maturity, valueTime, fixedPayTime)
 
-    val += amounts[i] * dboValue
+    @inbounds val += amounts[i] * dboValue
   end
 
   swaption.results.value = val
@@ -630,8 +630,8 @@ function _calculate!(pe::TreeSwaptionEngine, swaption::Swaption)
 
   lattice = pe.lattice
   stoppingTimes = zeros(length(swaption.exercise.dates))
-  for i = 1:length(stoppingTimes)
-    stoppingTimes[i] = year_fraction(dc, refDate, swaption.exercise.dates[i])
+  @simd for i = 1:length(stoppingTimes)
+    @inbounds stoppingTimes[i] = year_fraction(dc, refDate, swaption.exercise.dates[i])
   end
 
   initialize!(dSwaption, lattice.treeLattice, stoppingTimes[end])
