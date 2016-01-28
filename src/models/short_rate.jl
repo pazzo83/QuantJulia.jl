@@ -5,6 +5,20 @@ type PrivateConstraint{P <: Parameter} <: Constraint
   arguments::Vector{P}
 end
 
+type ShortRateModelCommon
+  observers::Vector
+end
+
+ShortRateModelCommon() = ShortRateModelCommon([])
+
+function add_observer!{T}(model::ShortRateModel, obsv::T)
+  if ~in(obsv, model.common.observers)
+    push!(model.common.observers, obsv)
+  end
+
+  return model
+end
+
 function QuantJulia.Math.test(c::PrivateConstraint, x::Vector{Float64})
   k = 1
   for i = 1:length(c.arguments)
@@ -66,6 +80,8 @@ function value(calibF::CalibrationFunction, params::Vector{Float64})
 
   return sqrt(_value)
 end
+
+notify_observers!(model::ShortRateModel) = model # do nothing
 
 # accessor methods ##
 get_a{M <: ShortRateModel}(m::M) = m.a.data[1]
@@ -243,6 +259,7 @@ type HullWhite{T <: TermStructure} <: ShortRateModel
   phi::HullWhiteFittingParameter
   ts::T
   privateConstraint::PrivateConstraint
+  common::ShortRateModelCommon
 end
 
 function HullWhite{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 = 0.01)
@@ -255,7 +272,7 @@ function HullWhite{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 =
 
   phi  = HullWhiteFittingParameter(a, sigma, ts)
 
-  return HullWhite(r0, a_const, sigma_const, phi, ts, privateConstraint)
+  return HullWhite(r0, a_const, sigma_const, phi, ts, privateConstraint, ShortRateModelCommon())
 end
 
 type HullWhiteDynamics{P <: Parameter} <: ShortRateDynamics
@@ -272,6 +289,14 @@ short_rate(dynamic::HullWhiteDynamics, t::Float64, x::Float64) = x + operator(dy
 get_params(m::HullWhite) = Float64[get_a(m), get_sigma(m)]
 
 generate_arguments!(m::HullWhite) = m.phi = HullWhiteFittingParameter(get_a(m), get_sigma(m), m.ts)
+
+function notify_observers!(m::HullWhite)
+  for obsv in m.common.observers
+    update!(obsv)
+  end
+
+  return m
+end
 
 function tree(model::HullWhite, grid::TimeGrid)
   phi = TermStructureFittingParameter(model.ts)
@@ -356,6 +381,8 @@ function set_params!{M <: ShortRateModel}(model::M, params::Vector{Float64})
      end
    end
    generate_arguments!(model)
+
+   notify_observers!(model)
    # model.phi = G2FittingParameter(get_a(model), get_sigma(model), get_b(model), get_eta(model), get_rho(model), model.ts)
    return model
  end

@@ -26,13 +26,13 @@ function get_state_prices!(t::TreeLattice1D, i::Int)
 end
 
 function compute_state_prices!(t::TreeLattice1D, until::Int)
-  for i = t.statePricesLimit:until - 1
+  @simd for i = t.statePricesLimit:until - 1
     push!(t.statePrices, zeros(get_size(t.impl, i + 1)))
     for j = 1:get_size(t.impl, i)
       disc = discount(t.impl, i, j)
-      statePrice = t.statePrices[i][j]
+      @inbounds statePrice = t.statePrices[i][j]
       for l = 1:t.n
-        t.statePrices[i + 1][descendant(t.impl, i, j, l)] += statePrice * disc * probability(t.impl, i, j, l)
+        @inbounds t.statePrices[i + 1][descendant(t.impl, i, j, l)] += statePrice * disc * probability(t.impl, i, j, l)
       end
     end
   end
@@ -65,10 +65,10 @@ function partial_rollback!(lattice::TreeLattice, asset::DiscretizedAsset, t::Flo
   iFrom = findfirst(lattice.tg.times .>= from)
   iTo = findfirst(lattice.tg.times .>= t)
 
-  for i = iFrom-1:-1:iTo
+  @simd for i = iFrom-1:-1:iTo
     newVals = zeros(get_size(lattice.impl, i))
     step_back!(lattice, i, asset.common.values, newVals)
-    asset.common.time = lattice.tg.times[i]
+    @inbounds asset.common.time = lattice.tg.times[i]
     asset.common.values = newVals
     if i != iTo
       adjust_values!(asset)
@@ -88,10 +88,10 @@ function step_back!(lattice::TreeLattice, i::Int, vals::Vector{Float64}, newVals
   for j = 1:get_size(lattice.impl, i)
     val = 0.0
     for l = 1:lattice.n
-      val += probability(lattice.impl, i, j, l) * vals[descendant(lattice.impl, i, j, l)]
+      @inbounds val += probability(lattice.impl, i, j, l) * vals[descendant(lattice.impl, i, j, l)]
     end
-    val += discount(lattice.impl, i, j)
-    newVals[j] = val
+    val *= discount(lattice.impl, i, j)
+    @inbounds newVals[j] = val
   end
 
   return newVals
@@ -151,7 +151,7 @@ function TrinomialTree{S <: StochasticProcess}(process::S, timeGrid::TimeGrid, i
   jMax = 0
   branchings = Vector{Branching}(nTimeSteps)
 
-  for i = 1:nTimeSteps
+  @simd for i = 1:nTimeSteps
     t = timeGrid.times[i]
     dt = timeGrid.dt[i]
 
@@ -163,17 +163,17 @@ function TrinomialTree{S <: StochasticProcess}(process::S, timeGrid::TimeGrid, i
     branching = Branching()
 
     for j =jMin:jMax
-      x = x0 + j * dx[i]
+      @inbounds x = x0 + j * dx[i]
       m = expectation(process, t, x, dt)
-      temp = round(Int, floor((m - x0) / dx[i+1] + 0.5))
+      @inbounds temp = round(Int, floor((m - x0) / dx[i+1] + 0.5))
 
       if isPositive
-        while (x0 + (temp - 1) * dx[i + 1] <= 0)
+        @inbounds while (x0 + (temp - 1) * dx[i + 1] <= 0)
           temp += 1
         end
       end
 
-      e = m - (x0 + temp * dx[i + 1])
+      @inbounds e = m - (x0 + temp * dx[i + 1])
       e2 = e * e
       e3 = e * sqrt(3.0)
 
@@ -184,7 +184,7 @@ function TrinomialTree{S <: StochasticProcess}(process::S, timeGrid::TimeGrid, i
       add!(branching, temp, p1, p2, p3)
     end
 
-    branchings[i] = branching # check if we need copy
+    @inbounds branchings[i] = branching # check if we need copy
 
     jMin = branching.jMin
     jMax = branching.jMax
@@ -198,7 +198,7 @@ function get_underlying(t::TrinomialTree, i::Int, idx::Int)
   if i == 1
     return t.process.x0
   else
-    return t.process.x0 + (t.branchings[i - 1].jMin + (idx - 1) * t.dx[i])
+    @inbounds return t.process.x0 + (t.branchings[i - 1].jMin + (idx - 1) * t.dx[i])
   end
 end
 

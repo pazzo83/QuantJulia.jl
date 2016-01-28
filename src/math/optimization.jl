@@ -179,10 +179,6 @@ function minimize!(lm::LevenbergMarquardt, p::Problem, endCriteria::EndCriteria)
   x = p.currentValue
   initCostValues = values!(p, x)
 
-  println(initCostValues)
-  println(x)
-  error("break")
-
   m = length(initCostValues)
   n = length(x)
   if lm.useCostFunctionsJacobin

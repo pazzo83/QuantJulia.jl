@@ -73,8 +73,19 @@ end
 
 function TreeSwaptionEngine{S <: ShortRateModel}(model::S, tg::TimeGrid)
   lattice = tree(model, tg)
+  ts = TreeSwaptionEngine(model, 0, tg, lattice)
 
-  return TreeSwaptionEngine(model, 0, tg, lattice)
+  add_observer!(model, ts)
+
+  return ts
+end
+
+function update!(eng::LatticeShortRateModelEngine)
+  if length(eng.tg.times) > 0
+    eng.lattice = tree(eng.model, eng.tg)
+  end
+
+  return eng
 end
 
 type DiscretizedAssetCommon{L <: Lattice}
@@ -317,7 +328,7 @@ function reset!(dSwap::DiscretizedSwap, sz::Int)
 end
 
 function reset!(dBond::DiscretizedDiscountBond, sz::Int)
-  dBond.common.values = zeros(sz)
+  dBond.common.values = ones(sz)
 
   return dBond
 end
@@ -326,7 +337,7 @@ function pre_adjust_values_impl!(dSwap::DiscretizedSwap)
   # Floating payments
   for i = 1:length(dSwap.floatingResetTimes)
     t = dSwap.floatingResetTimes[i]
-    if t > 0.0 && is_on_time(dSwap, t)
+    if t >= 0.0 && is_on_time(dSwap, t)
       bond = DiscretizedDiscountBond()
       initialize!(bond, dSwap.common.method, dSwap.floatingPayTimes[i])
       rollback!(bond, dSwap.common.time)

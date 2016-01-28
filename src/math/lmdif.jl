@@ -1,69 +1,69 @@
 const MACHEP = 1.2e-16
 const DWARF = 1.0e-38
 
-# function enorm{I <: Integer}(n::I, x::Vector{Float64})
-#   const rdwarf = 3.834e-20
-#   const rgiant = 1.304e19
-#
-#   s1 = s2 = s3 = x1max = x3max = 0.0
-#
-#   floatn = float(n)
-#   agiant = rgiant / floatn
-#
-#   for i = 1:n
-#     xabs = abs(x[i])
-#     if xabs > rdwarf && xabs < agiant
-#       # sum for intermediate components
-#       s2 += xabs * xabs
-#       continue
-#     end
-#
-#     if xabs > rdwarf
-#       # sum for larger components
-#       if xabs > x1max
-#         temp = x1max / xabs
-#         s1 = 1.0 + s1 * temp * temp
-#         x1max = xabs
-#       else
-#         temp = xabs / x1max
-#         s1 += temp * temp
-#       end
-#
-#       continue
-#     end
-#
-#     # sum for smaller components
-#     if xabs > x3max
-#       temp = x3max / xabs
-#       s3 = 1.0 + s3 * temp * temp
-#       x3max = xabs
-#     else
-#       if xabs != 0.0
-#         temp = xabs / x3max
-#         s3 += temp * temp
-#       end
-#     end
-#   end
-#
-#   # Calculation of norm
-#   if s1 != 0.0
-#     temp = s1 + (s2 / x1max) / x1max
-#     return x1max * sqrt(temp)
-#   end
-#
-#   if s2 != 0.0
-#     if s2 >= x3max
-#       temp = s2 * (1.0 + (x3max / s2) * (x3max * s3))
-#     else
-#       temp = x3max * ((s2 / x3max) + (x3max * s3))
-#     end
-#     ans = sqrt(temp)
-#   else
-#     ans = x3max * sqrt(s3)
-#   end
-#
-#   return ans
-# end
+function enorm{I <: Integer}(n::I, x::Vector{Float64})
+  const rdwarf = 3.834e-20
+  const rgiant = 1.304e19
+
+  s1 = s2 = s3 = x1max = x3max = 0.0
+
+  floatn = float(n)
+  agiant = rgiant / floatn
+
+  for i = 1:n
+    xabs = abs(x[i])
+    if xabs > rdwarf && xabs < agiant
+      # sum for intermediate components
+      s2 += xabs * xabs
+      continue
+    end
+
+    if xabs > rdwarf
+      # sum for larger components
+      if xabs > x1max
+        temp = x1max / xabs
+        s1 = 1.0 + s1 * temp * temp
+        x1max = xabs
+      else
+        temp = xabs / x1max
+        s1 += temp * temp
+      end
+
+      continue
+    end
+
+    # sum for smaller components
+    if xabs > x3max
+      temp = x3max / xabs
+      s3 = 1.0 + s3 * temp * temp
+      x3max = xabs
+    else
+      if xabs != 0.0
+        temp = xabs / x3max
+        s3 += temp * temp
+      end
+    end
+  end
+
+  # Calculation of norm
+  if s1 != 0.0
+    temp = s1 + (s2 / x1max) / x1max
+    return x1max * sqrt(temp)
+  end
+
+  if s2 != 0.0
+    if s2 >= x3max
+      temp = s2 * (1.0 + (x3max / s2) * (x3max * s3))
+    else
+      temp = x3max * ((s2 / x3max) + (x3max * s3))
+    end
+    ans = sqrt(temp)
+  else
+    ans = x3max * sqrt(s3)
+  end
+
+  return ans
+end
 
 # Forward Difference Approximation #
 function fdjac2!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float64}, fjac::Matrix{Float64}, ::I, iflag::I, epsfcn::Float64, wa::Vector{Float64}, fcn!::Function)
@@ -116,7 +116,7 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
   # Compute the initial column norms and initialize several arrays
   ij = 1
   for j = 1:n
-    acnorm[j] = vecnorm(a[:, ij])
+    acnorm[j] = enorm(m, a[:, ij])
     rdiag[j] = acnorm[j]
     wa[j] = rdiag[j]
     if pivot != 0
@@ -164,8 +164,8 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
     # Compute the householder transformation to reduce the j-th column of a to
     # a multiple of the j-th unit vector
     jj = j + m * (j - 1)
-    jj_end = jj + (m - j)
-    ajnorm = vecnorm(a[jj:jj_end])
+    # jj_end = jj + (m - j)
+    ajnorm = enorm(m - (j - 1), a[jj:end])
     if ajnorm == 0.0
       @goto L100
     end
@@ -214,7 +214,7 @@ function qrfac!{I <: Integer}(m::I, n::I, a::Matrix{Float64}, ::I, pivot::I, ipv
 
           if 0.05 * temp * temp <= MACHEP
             a_start = jp1 + m * (k - 1)
-            rdiag[k] = vecnorm(a[a_start:a_start + (m-j) - 1])
+            rdiag[k] = enorm(m - j, a[a_start:end])
             wa[k] = rdiag[k]
           end
         end
@@ -396,7 +396,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     wa2[j] = diag_[j] * x[j]
   end
 
-  dxnorm = vecnorm(wa2)
+  dxnorm = enorm(n, wa2)
   fp = dxnorm - delta
 
   fp <= 0.1 * delta && @goto L220
@@ -423,7 +423,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
       wa1[j] = (wa1[j] - sum_) / r[j + ldr * (j - 1)]
       jj += ldr
     end
-    temp = vecnorm(wa1)
+    temp = enorm(n, wa1)
     parl = ((fp / delta) / temp) / temp
   end
 
@@ -440,7 +440,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     jj += ldr
   end
 
-  gnorm = vecnorm(wa1)
+  gnorm = enorm(n, wa1)
   paru = gnorm / delta
   if paru == 0.0
     paru = DWARF / min(delta, 0.1)
@@ -475,7 +475,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     wa2[j] = diag_[j] * x[j]
   end
 
-  dxnorm = vecnorm(wa2)
+  dxnorm = enorm(n, wa2)
   temp = fp
   fp = dxnorm - delta
 
@@ -504,7 +504,7 @@ function lmpar!{I <: Integer}(n::I, r::Matrix{Float64}, ldr::I, ipvt::Vector{I},
     end
     jj += ldr
   end
-  temp = vecnorm(wa1)
+  temp = enorm(n, wa1)
   parc = ((fp / delta) / temp) / temp
 
   # depending on the sign of the function, update parl or paru
@@ -559,7 +559,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
   if iflag < 0
     @goto L300
   end
-  fnorm = vecnorm(fvec)
+  fnorm = enorm(m, fvec)
 
   # Initialize the levenberg-marquardt param and iteration counter
   par = 0.0
@@ -622,7 +622,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
       wa3[j] = diag_[j] * x[j]
     end
 
-    xnorm = vecnorm(wa3)
+    xnorm = enorm(n, wa3)
     delta = factor_ * xnorm
     if delta == 0.0
       delta = factor_
@@ -727,7 +727,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     wa3[j] = diag_[j] * wa1[j]
   end
 
-  pnorm = vecnorm(wa3)
+  pnorm = enorm(n, wa3)
 
   # on the initial iteration, adjust the initial step bound
   if iter == 1
@@ -742,7 +742,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     @goto L300
   end
 
-  fnorm1 = vecnorm(wa4)
+  fnorm1 = enorm(m, wa4)
   # println(wa4)
 
   # Compute the scaled actual reduction
@@ -771,7 +771,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     jj += m
   end
 
-  temp1 = vecnorm(wa3) / fnorm
+  temp1 = enorm(n, wa3) / fnorm
   temp2 = (sqrt(par) * pnorm) / fnorm
   prered = temp1 * temp1 + (temp2 * temp2) / 0.5
   dirder = -(temp1 * temp1 + temp2 * temp2)
@@ -807,7 +807,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
     end
   end
   # test for successful iteration
-  if ratio > 0.0001
+  if ratio >= 0.0001
     for j = 1:n
       x[j] = wa2[j]
       wa2[j] = diag_[j] * x[j]
@@ -816,7 +816,7 @@ function lmdif!{I <: Integer}(m::I, n::I, x::Vector{Float64}, fvec::Vector{Float
       fvec[i] = wa4[i]
     end
 
-    xnorm = vecnorm(wa2)
+    xnorm = enorm(n, wa2)
     fnorm = fnorm1
     iter += 1
   end

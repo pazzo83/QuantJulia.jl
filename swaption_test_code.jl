@@ -95,7 +95,7 @@ function main()
   # println(@sprintf("b = %.6f, eta = %.6f", get_params(modelG2)[3], get_params(modelG2)[4]))
   # println(@sprintf("rho = %.6f", get_params(modelG2)[5]))
   #
-  # # Hull White
+  # Hull White
   # for swaptionHelper in swaptions
   #   update_pricing_engine!(swaptionHelper, JamshidianSwaptionEngine(hullWhiteModel))
   # end
@@ -109,5 +109,7 @@ function main()
   end
 
   calibrate_model(hullWhiteModel2, swaptions)
+  # println("calibrated to: ")
+  # println(@sprintf("a = %.6f, sigma = %.6f", get_params(hullWhiteModel)[1], get_params(hullWhiteModel)[2]))
 
 end
