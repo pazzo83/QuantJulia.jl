@@ -29,6 +29,9 @@ include("math/Math.jl")
 
 # MAIN MODULE CODE
 
+# Constants #
+const basisPoint = 0.0001
+
 export
     # abstract_types.jl
     LazyObject,
@@ -122,11 +125,23 @@ export
     # models/calibration_helpers.jl
     SwaptionHelper, implied_volatility!, add_times_to!, model_value!,
 
-    # models/short_rate.jl
-    PrivateConstraint, G2, HullWhite, test, calibrate!, func_values, value, get_params,
+    # models/short_rate/short_rate.jl
+    PrivateConstraint, test, calibrate!, func_values, value, get_params,
+
+    # models/short_rate/two_factor.jl
+    G2,
+
+    # models/short_rate/one_factor.jl
+    HullWhite,
 
     # pricing_engines/pricing_engines.jl
-    DiscountingBondEngine, DiscountingSwapEngine, G2SwaptionEngine, JamshidianSwaptionEngine, TreeSwaptionEngine, calculate
+    DiscountingBondEngine, DiscountingSwapEngine,
+
+    # pricing_engines/discretized_asset.jl
+    DiscretizedSwaption, DiscretizedSwap,
+
+    # pricing_engines/swaption_engines.jl
+    G2SwaptionEngine, JamshidianSwaptionEngine, TreeSwaptionEngine, calculate
 
 # abstract types
 include("abstract_types.jl")
@@ -189,10 +204,14 @@ include("termstructures/nonlinear_fitting_methods.jl")
 # Models ---------------------------------
 include("models/parameter.jl")
 include("models/calibration_helpers.jl")
-include("models/short_rate.jl")
+include("models/short_rate/short_rate.jl")
+include("models/short_rate/two_factor.jl")
+include("models/short_rate/one_factor.jl")
 
 # Pricing Engines ------------------------
 include("pricing_engines/pricing_engines.jl")
+include("pricing_engines/discretized_asset.jl")
+include("pricing_engines/swaption_engines.jl")
 
 # # Helpers NOW IN TERM STRUCTURE
 # include("helpers/bond_helpers.jl")

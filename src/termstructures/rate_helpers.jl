@@ -76,7 +76,6 @@ function implied_quote(depo::DepositRateHelper)
 end
 
 function implied_quote(swap_helper::SwapRateHelper)
-  const basisPoint = 0.0001
   swap = swap_helper.swap
   recalculate!(swap)
   #
