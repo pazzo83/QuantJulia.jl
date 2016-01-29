@@ -1,4 +1,4 @@
-operator{P <: Parameter}(param::P, t::Float64) = value(param, t)
+call{P <: Parameter}(param::P, t::Float64) = value(param, t)
 
 type ConstantParameter <: Parameter
   data::Vector{Float64}

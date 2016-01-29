@@ -43,7 +43,7 @@ abstract RateHelper <: BootstrapHelper
 abstract PricingEngine{Y}
 abstract DiscretizedAsset
 abstract DiscretizedOption <: DiscretizedAsset
-abstract LatticeShortRateModelEngine{S, Y, T} <: PricingEngine{Y}
+abstract LatticeShortRateModelEngine{S, Y} <: PricingEngine{Y}
 
 # Cash Flows
 abstract CashFlows
@@ -61,6 +61,8 @@ abstract Parameter
 abstract CalibrationErrorType
 abstract CalibrationHelper <: LazyObject
 abstract ShortRateModel
+abstract OneFactorModel <: ShortRateModel
+abstract TwoFactorModel <: ShortRateModel
 abstract ShortRateDynamics
 abstract ShortRateTree
 

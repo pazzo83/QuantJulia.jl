@@ -198,7 +198,7 @@ function get_underlying(t::TrinomialTree, i::Int, idx::Int)
   if i == 1
     return t.process.x0
   else
-    @inbounds return t.process.x0 + (t.branchings[i - 1].jMin + (idx - 1) * t.dx[i])
+    @inbounds return t.process.x0 + (t.branchings[i - 1].jMin + (idx - 1)) * t.dx[i]
   end
 end
 

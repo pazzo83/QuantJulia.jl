@@ -32,21 +32,33 @@ type JamshidianSwaptionEngine{S <: ShortRateModel, Y <: YieldTermStructure} <: P
   end
 end
 
-type TreeSwaptionEngine{S <: ShortRateModel, I <: Integer, T <: ShortRateTree, Y <: YieldTermStructure} <: LatticeShortRateModelEngine{S, Y, T}
-  model::S
-  timeSteps::I
+type LatticeShortRateModelEngineCommon{T <: ShortRateTree}
   tg::TimeGrid
   lattice::T
+end
+
+
+type TreeSwaptionEngine{S <: ShortRateModel, I <: Integer, Y <: YieldTermStructure} <: LatticeShortRateModelEngine{S, Y}
+  model::S
+  timeSteps::I
+  common::LatticeShortRateModelEngineCommon
   ts::Y
 
-  call{S, I, T}(::Type{TreeSwaptionEngine}, m::S, tsteps::I, tg::TimeGrid, l::T) = new{S, I, T, YieldTermStructure}(m, tsteps, tg, l)
+  function call{S, I}(::Type{TreeSwaptionEngine}, m::S, tsteps::I)
+    t = new{S, I, YieldTermStructure}(m, tsteps)
+    add_observer!(m, t)
 
-  call{S, I, T, Y}(::Type{TreeSwaptionEngine}, m::S, tsteps::I, tg::TimeGrid, l::T, ts::Y) = new{S, I, T, Y}(m, tsteps, tg, l, ts)
+    return t
+  end
+
+  call{S, I}(::Type{TreeSwaptionEngine}, m::S, tsteps::I, l::LatticeShortRateModelEngineCommon) = new{S, I, YieldTermStructure}(m, tsteps, l)
+
+  call{S, I, Y}(::Type{TreeSwaptionEngine}, m::S, tsteps::I, l::LatticeShortRateModelEngineCommon, ts::Y) = new{S, I, T, Y}(m, tsteps, l, ts)
 end
 
 function TreeSwaptionEngine{S <: ShortRateModel}(model::S, tg::TimeGrid)
   lattice = tree(model, tg)
-  ts = TreeSwaptionEngine(model, 0, tg, lattice)
+  ts = TreeSwaptionEngine(model, 0, LatticeShortRateModelEngineCommon(tg, lattice))
 
   add_observer!(model, ts)
 
@@ -54,8 +66,8 @@ function TreeSwaptionEngine{S <: ShortRateModel}(model::S, tg::TimeGrid)
 end
 
 function update!(eng::LatticeShortRateModelEngine)
-  if length(eng.tg.times) > 0
-    eng.lattice = tree(eng.model, eng.tg)
+  if length(eng.common.tg.times) > 0
+    eng.common.lattice = tree(eng.model, eng.common.tg)
   end
 
   return eng
@@ -222,7 +234,15 @@ function _calculate!(pe::TreeSwaptionEngine, swaption::Swaption)
 
   dSwaption = DiscretizedSwaption(swaption, refDate, dc)
 
-  lattice = pe.lattice
+  if isdefined(pe, :common)
+    lattice = pe.common.lattice
+  else
+    times = mandatory_times(dSwaption)
+    tg = TimeGrid(times, pe.timeSteps)
+    lattice = tree(pe.model, tg)
+    pe.common = LatticeShortRateModelEngineCommon(tg, lattice)
+  end
+
   stoppingTimes = zeros(length(swaption.exercise.dates))
   @simd for i = 1:length(stoppingTimes)
     @inbounds stoppingTimes[i] = year_fraction(dc, refDate, swaption.exercise.dates[i])

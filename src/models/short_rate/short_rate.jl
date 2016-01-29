@@ -87,7 +87,12 @@ get_a{M <: ShortRateModel}(m::M) = m.a.data[1]
 get_sigma{M <: ShortRateModel}(m::M) = m.sigma.data[1]
 get_b{M <: ShortRateModel}(m::M) = m.b.data[1]
 
+check_params_equal(m::ShortRateModel, params::Vector{Float64}) = get_params(m) == params
+
 function set_params!{M <: ShortRateModel}(model::M, params::Vector{Float64})
+  if check_params_equal(model, params)
+    return model
+  end
   paramCount = 1
   args = model.privateConstraint.arguments
   for i = 1:length(args)

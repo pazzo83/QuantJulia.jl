@@ -132,7 +132,7 @@ export
     G2,
 
     # models/short_rate/one_factor.jl
-    HullWhite,
+    BlackKarasinski, HullWhite,
 
     # pricing_engines/pricing_engines.jl
     DiscountingBondEngine, DiscountingSwapEngine,

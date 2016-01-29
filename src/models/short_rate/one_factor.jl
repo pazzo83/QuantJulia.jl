@@ -28,7 +28,29 @@ end
 descendant(tr::OneFactorShortRateTree, i::Int, idx::Int, branch::Int) = descendant(tr.tree, i, idx, branch)
 probability(tr::OneFactorShortRateTree, i::Int, idx::Int, branch::Int) = probability(tr.tree, i, idx, branch)
 
-type HullWhite{T <: TermStructure} <: ShortRateModel
+get_params(m::OneFactorModel) = Float64[get_a(m), get_sigma(m)]
+
+type BlackKarasinski{T <: TermStructure} <: OneFactorModel
+  a::ConstantParameter
+  sigma::ConstantParameter
+  ts::T
+  privateConstraint::PrivateConstraint
+  common::ShortRateModelCommon
+end
+
+function BlackKarasinski(ts::TermStructure, a::Float64 = 0.1, sigma = 0.1)
+  a_const = ConstantParameter([a], PositiveConstraint())
+  sigma_const = ConstantParameter([sigma], PositiveConstraint())
+
+  privateConstraint = PrivateConstraint(ConstantParameter[a_const, sigma_const])
+
+  return BlackKarasinski(a_const, sigma_const, ts, privateConstraint, ShortRateModelCommon())
+end
+
+generate_arguments!(m::BlackKarasinski) = m # do nothing
+
+
+type HullWhite{T <: TermStructure} <: OneFactorModel
   r0::Float64
   a::ConstantParameter
   sigma::ConstantParameter
@@ -51,6 +73,8 @@ function HullWhite{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 =
   return HullWhite(r0, a_const, sigma_const, phi, ts, privateConstraint, ShortRateModelCommon())
 end
 
+## Dynamics ##
+
 type HullWhiteDynamics{P <: Parameter} <: ShortRateDynamics
   process::OrnsteinUhlenbeckProcess
   fitting::P
@@ -60,19 +84,64 @@ end
 
 HullWhiteDynamics{P <: Parameter}(fitting::P, a::Float64, sigma::Float64) = HullWhiteDynamics(OrnsteinUhlenbeckProcess(a, sigma), fitting, a, sigma)
 
-short_rate(dynamic::HullWhiteDynamics, t::Float64, x::Float64) = x + operator(dynamic.fitting, t)
-
-get_params(m::HullWhite) = Float64[get_a(m), get_sigma(m)]
+short_rate(dynamic::HullWhiteDynamics, t::Float64, x::Float64) = x + dynamic.fitting(t)
 
 generate_arguments!(m::HullWhite) = m.phi = HullWhiteFittingParameter(get_a(m), get_sigma(m), m.ts)
 
-function notify_observers!(m::HullWhite)
+function notify_observers!(m::OneFactorModel)
   for obsv in m.common.observers
     update!(obsv)
   end
 
   return m
 end
+
+type BlackKarasinskiDynamics{P <: Parameter} <: ShortRateDynamics
+  process::OrnsteinUhlenbeckProcess
+  fitting::P
+  a::Float64
+  sigma::Float64
+end
+
+BlackKarasinskiDynamics{P <: Parameter}(fitting::P, a::Float64, sigma::Float64) = BlackKarasinskiDynamics(OrnsteinUhlenbeckProcess(a, sigma), fitting, a, sigma)
+
+short_rate(dynamic::BlackKarasinskiDynamics, t::Float64, x::Float64) = exp(x + dynamic.fitting(t))
+
+immutable BlackKarasinskiHelper{I <: Integer}
+  sz::I
+  xMin::Float64
+  dx::Float64
+  dt::Float64
+  discountBondPrice::Float64
+  statePrices::Vector{Float64}
+end
+
+function BlackKarasinskiHelper{I <: Integer}(i::I, xMin::Float64, dx::Float64, discountBond::Float64, _tree::OneFactorShortRateTree)
+  sz = get_size(_tree, i)
+  statePrices = get_state_prices!(_tree, i)
+  dt = _tree.tg.dt[i]
+
+  return BlackKarasinskiHelper(sz, xMin, dx, dt, discountBond, statePrices)
+end
+
+function operator(bkh::BlackKarasinskiHelper)
+  function _inner(theta::Float64)
+    val = bkh.discountBondPrice
+    x = bkh.xMin
+
+    for j = 1:bkh.sz
+      disc = exp(-exp(theta + x) * bkh.dt)
+      val -= bkh.statePrices[j] * disc
+      x += bkh.dx
+    end
+
+    return val
+  end
+
+  return _inner
+end
+
+## Tree methods ##
 
 function tree(model::HullWhite, grid::TimeGrid)
   phi = TermStructureFittingParameter(model.ts)
@@ -100,6 +169,35 @@ function tree(model::HullWhite, grid::TimeGrid)
 
   return numericTree
 end
+
+function tree(model::BlackKarasinski, grid::TimeGrid)
+  phi = TermStructureFittingParameter(model.ts)
+
+  numericDynamics = BlackKarasinskiDynamics(phi, get_a(model), get_sigma(model))
+  trinomial = TrinomialTree(numericDynamics.process, grid)
+  numericTree = OneFactorShortRateTree{BlackKarasinskiDynamics}(trinomial, numericDynamics, grid)
+
+  reset_param_impl!(phi)
+
+  val = 1.0
+  vMin = -50.0
+  vMax = 50.0
+
+  @simd for i = 1:length(grid.times) - 1
+    @inbounds discountBond = discount(model.ts, grid.times[i + 1])
+    xMin = get_underlying(trinomial, i, 1)
+    @inbounds dx = trinomial.dx[i]
+
+    solverHelper = BlackKarasinskiHelper(i, xMin, dx, discountBond, numericTree)
+    slvr = BrentSolver(1000) # max evals = 1000
+    val = solve(slvr, operator(solverHelper), 1e-7, val, vMin, vMax)
+
+    @inbounds set_params!(phi, grid.times[i], val)
+  end
+
+  return numericTree
+end
+
 
 type RStarFinder{M <: ShortRateModel}
   model::M

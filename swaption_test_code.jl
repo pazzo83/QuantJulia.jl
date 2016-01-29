@@ -65,6 +65,8 @@ function main()
   fixedOTMRate = fixedATMRate * 1.2
   fixedITMRate = fixedATMRate * 0.8
 
+  atmSwap = VanillaSwap(swapType, 1000.0, fixedSchedule, fixedATMRate, fixedLegDayCounter, indexSixMonths, 0.0, floatSchedule, indexSixMonths.dc, DiscountingSwapEngine(rhTermStructure))
+
   times = zeros(0)
   swaptions = Vector{SwaptionHelper}(numRows)
 
@@ -84,11 +86,13 @@ function main()
   modelG2 = G2(rhTermStructure)
   hullWhiteModel = HullWhite(rhTermStructure)
   hullWhiteModel2 = HullWhite(rhTermStructure)
+  blackKarasinski = BlackKarasinski(rhTermStructure)
 
   for swaptionHelper in swaptions
     swaptionHelper.pricingEngine = G2SwaptionEngine(modelG2, 6.0, 16)
   end
 
+  println("G2 (analytic formulae) calibration")
   calibrate_model(modelG2, swaptions)
   println("calibrated to: ")
   println(@sprintf("a = %.6f, sigma = %.6f", get_params(modelG2)[1], get_params(modelG2)[2]))
@@ -100,18 +104,49 @@ function main()
     update_pricing_engine!(swaptionHelper, JamshidianSwaptionEngine(hullWhiteModel))
   end
 
+  println("")
+  println("Hull-White (analytic formulae) calibration")
   calibrate_model(hullWhiteModel, swaptions)
   println("calibrated to: ")
   println(@sprintf("a = %.6f, sigma = %.6f", get_params(hullWhiteModel)[1], get_params(hullWhiteModel)[2]))
 
-  tic()
+  # Hull White (numeric)
   for swaptionHelper in swaptions
     swaptionHelper.pricingEngine = TreeSwaptionEngine(hullWhiteModel2, tg)
   end
-  toc()
 
+  println("")
+  println("Hull-White (numerical) calibration")
   calibrate_model(hullWhiteModel2, swaptions)
   println("calibrated to: ")
   println(@sprintf("a = %.6f, sigma = %.6f", get_params(hullWhiteModel2)[1], get_params(hullWhiteModel2)[2]))
 
+  # Black Karasinski
+  for swaptionHelper in swaptions
+    swaptionHelper.pricingEngine = TreeSwaptionEngine(blackKarasinski, tg)
+  end
+
+  println("")
+  println("Black-Karasinski (numerical) calibration")
+  calibrate_model(blackKarasinski, swaptions)
+  println("calibrated to: ")
+  println(@sprintf("a = %.6f, sigma = %.6f", get_params(blackKarasinski)[1], get_params(blackKarasinski)[2]))
+
+  # ATM Bermudan swaption pricing
+  println(@sprintf("Payer bermudan swaption struk at %.6f %% (ATM)", fixedATMRate))
+
+  # swapLeg = swap.legs[1] # Fixed Leg
+  #
+  # bermudanDates = Vector{Date}(length(swapLeg.coupons))
+  # for i=1:length(swapLeg.coupons)
+  #   bermudanDates[i]  = accrual_start_date(swapLeg.coupons[i])
+  # end
+  #
+  # bermudanExercise = BermudanExercise(bermudanDates)
+  #
+  # bermudanSwaption = Swaption(atmSwap, bermudanExercise)
+  #
+  # update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(modelG2, 50))
+  #
+  # println(@sprintf("G2 (tree):       %.6f", npv(bermudanSwaption)))
 end

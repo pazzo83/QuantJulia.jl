@@ -1,7 +1,15 @@
 using QuantJulia.Math
 using Distributions
 
-type G2{T <: TermStructure} <: ShortRateModel
+# type TwoFactorShortRateTree{S <: ShortRateDynamics} <: ShortRateTree
+
+
+function tree(model::TwoFactorModel)
+  #stuff
+
+end
+
+type G2{T <: TermStructure} <: TwoFactorModel
   a::ConstantParameter
   sigma::ConstantParameter
   b::ConstantParameter
