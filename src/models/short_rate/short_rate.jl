@@ -1,5 +1,8 @@
 using QuantJulia.Math
 
+## ShortRateTree methods ##
+get_state_prices!(tree::ShortRateTree, i::Int) = get_state_prices!(tree.treeLattice, i)
+
 type PrivateConstraint{P <: Parameter} <: Constraint
   arguments::Vector{P}
 end
@@ -80,7 +83,13 @@ function value(calibF::CalibrationFunction, params::Vector{Float64})
   return sqrt(_value)
 end
 
-notify_observers!(model::ShortRateModel) = model # do nothing
+function notify_observers!(m::ShortRateModel)
+  for obsv in m.common.observers
+    update!(obsv)
+  end
+
+  return m
+end
 
 # accessor methods ##
 get_a{M <: ShortRateModel}(m::M) = m.a.data[1]

@@ -14,6 +14,16 @@ type G2FittingParameter{T <: TermStructure} <: Parameter
   ts::T
 end
 
+function value(param::G2FittingParameter, t::Float64)
+  forward = forward_rate(param.ts, t, t, ContinuousCompounding(), NoFrequency()).rate
+  temp1 = param.sigma * (1.0 - exp(-param.a * t)) / param.a
+  temp2 = param.eta * (1.0 - exp(-param.b * t)) / param.b
+
+  val = 0.5 * temp1 * temp1 + 0.5 * temp2 * temp2 + param.rho * temp1 * temp2 + forward
+
+  return val
+end
+
 type HullWhiteFittingParameter{T <: TermStructure} <: Parameter
   a::Float64
   sigma::Float64

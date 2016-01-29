@@ -1,13 +1,63 @@
 using QuantJulia.Math
 using Distributions
 
-# type TwoFactorShortRateTree{S <: ShortRateDynamics} <: ShortRateTree
+type TwoFactorShortRateTree{S <: ShortRateDynamics} <: ShortRateTree
+  tree1::TrinomialTree
+  tree2::TrinomialTree
+  dynamics::S
+  treeLattice::TreeLattice2D
 
+  function TwoFactorShortRateTree{S}(tree1::TrinomialTree, tree2::TrinomialTree, dyn::S)
+    twoFactorTree = new(tree1, tree2, dyn)
+    twoFactorTree.treeLattice = TreeLattice2D(tree1, tree2, dyn.correlation, twoFactorTree)
 
-function tree(model::TwoFactorModel)
-  #stuff
-
+    return twoFactorTree
+  end
 end
+
+function tree(model::TwoFactorModel, grid::TimeGrid)
+  #stuff
+  dyn = get_dynamics(model)
+
+  tree1 = TrinomialTree(dyn.xProcess, grid)
+  tree2 = TrinomialTree(dyn.yProcess, grid)
+
+  return TwoFactorShortRateTree{typeof(dyn)}(tree1, tree2, dyn)
+end
+
+get_size(tr::TwoFactorShortRateTree, i::Int) = get_size(tr.treeLattice, i)
+
+descendant(tr::TwoFactorShortRateTree, i::Int, idx::Int, branch::Int) = descendant(tr.treeLattice, i, idx, branch)
+probability(tr::TwoFactorShortRateTree, i::Int, idx::Int, branch::Int) = probability(tr.treeLattice, i, idx, branch)
+
+function discount(tr::TwoFactorShortRateTree, i::Int, idx::Int)
+  modulo = get_size(tr.tree1, i)
+  new_idx = idx - 1
+
+  index1 = round(Int, floor(new_idx % modulo)) + 1
+  index2 = round(Int, floor(new_idx / modulo)) + 1
+
+  x = get_underlying(tr.tree1, i, index1)
+  y = get_underlying(tr.tree2, i, index2)
+
+  r = short_rate(tr.dynamics, tr.treeLattice.tg.times[i], x, y)
+
+  # println("$i $idx $r $x $y $modulo $index1 $index2")
+
+  return exp(-r * tr.treeLattice.tg.dt[i])
+end
+
+type G2Dynamics{P <: Parameter} <: ShortRateDynamics
+  fitting::P
+  xProcess::OrnsteinUhlenbeckProcess
+  yProcess::OrnsteinUhlenbeckProcess
+  correlation::Float64
+end
+
+G2Dynamics{P <: Parameter}(fitting::P, a::Float64, sigma::Float64, b::Float64, eta::Float64, rho::Float64) =
+          G2Dynamics{P}(fitting, OrnsteinUhlenbeckProcess(a, sigma), OrnsteinUhlenbeckProcess(b, eta), rho)
+
+short_rate(dyn::G2Dynamics, t::Float64, x::Float64, y::Float64) = dyn.fitting(t) + x + y
 
 type G2{T <: TermStructure} <: TwoFactorModel
   a::ConstantParameter
@@ -18,6 +68,7 @@ type G2{T <: TermStructure} <: TwoFactorModel
   phi::G2FittingParameter
   ts::T
   privateConstraint::PrivateConstraint
+  common::ShortRateModelCommon
 end
 
 function G2{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 = 0.01, b::Float64 = 0.1, eta::Float64 = 0.01, rho::Float64 = -0.75)
@@ -31,7 +82,7 @@ function G2{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 = 0.01, 
 
   phi = G2FittingParameter(a, sigma, b, eta, rho, ts)
 
-  return G2(a_const, sigma_const, b_const, eta_const, rho_const, phi, ts, privateConstraint)
+  return G2(a_const, sigma_const, b_const, eta_const, rho_const, phi, ts, privateConstraint, ShortRateModelCommon())
 end
 
 get_eta(m::G2) = m.eta.data[1]
@@ -40,6 +91,8 @@ get_rho(m::G2) = m.rho.data[1]
 get_params(m::G2) = Float64[get_a(m), get_sigma(m), get_b(m), get_eta(m), get_rho(m)]
 
 generate_arguments!(m::G2) = m.phi = G2FittingParameter(get_a(m), get_sigma(m), get_b(m), get_eta(m), get_rho(m), m.ts)
+
+get_dynamics(m::G2) = G2Dynamics(m.phi, get_a(m), get_sigma(m), get_b(m), get_eta(m), get_rho(m))
 
 function V(m::G2, t::Float64)
   expat = exp(-get_a(m) * t)

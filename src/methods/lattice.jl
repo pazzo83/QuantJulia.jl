@@ -1,102 +1,5 @@
 using QuantJulia.Time, QuantJulia.Math
 
-type TreeLattice1D{T, I <: Integer} <: TreeLattice
-  tg::TimeGrid
-  impl::T
-  statePrices::Vector{Vector{Float64}}
-  n::I
-  statePricesLimit::I
-end
-
-function TreeLattice1D{I <: Integer, T}(tg::TimeGrid, n::I, impl::T)
-  statePrices = Vector{Vector{Float64}}(1)
-  statePrices[1] = ones(1)
-
-  statePricesLimit = 1
-
-  return TreeLattice1D(tg, impl, statePrices, n, statePricesLimit)
-end
-
-function get_state_prices!(t::TreeLattice1D, i::Int)
-  if i > t.statePricesLimit
-    compute_state_prices!(t, i)
-  end
-
-  return t.statePrices[i]
-end
-
-function compute_state_prices!(t::TreeLattice1D, until::Int)
-  @simd for i = t.statePricesLimit:until - 1
-    push!(t.statePrices, zeros(get_size(t.impl, i + 1)))
-    for j = 1:get_size(t.impl, i)
-      disc = discount(t.impl, i, j)
-      @inbounds statePrice = t.statePrices[i][j]
-      for l = 1:t.n
-        @inbounds t.statePrices[i + 1][descendant(t.impl, i, j, l)] += statePrice * disc * probability(t.impl, i, j, l)
-      end
-    end
-  end
-
-  t.statePricesLimit = until
-
-  return t
-end
-
-function initialize!(lattice::TreeLattice, asset::DiscretizedAsset, t::Float64)
-  i = findfirst(lattice.tg.times .>= t)
-  set_time!(asset, t)
-  reset!(asset, get_size(lattice.impl, i))
-end
-
-function rollback!(lattice::TreeLattice, asset::DiscretizedAsset, t::Float64)
-  partial_rollback!(lattice, asset, t)
-  adjust_values!(asset)
-
-  return asset
-end
-
-function partial_rollback!(lattice::TreeLattice, asset::DiscretizedAsset, t::Float64)
-  from = asset.common.time
-
-  if QuantJulia.Math.is_close(from, t)
-    return
-  end
-
-  iFrom = findfirst(lattice.tg.times .>= from)
-  iTo = findfirst(lattice.tg.times .>= t)
-
-  @simd for i = iFrom-1:-1:iTo
-    newVals = zeros(get_size(lattice.impl, i))
-    step_back!(lattice, i, asset.common.values, newVals)
-    @inbounds asset.common.time = lattice.tg.times[i]
-    asset.common.values = newVals
-    if i != iTo
-      adjust_values!(asset)
-    end
-  end
-
-  return asset
-end
-
-function present_value(lattice::TreeLattice, asset::DiscretizedAsset)
-  i = findfirst(lattice.tg.times .>= asset.common.time)
-  return dot(asset.common.values, lattice.statePrices[i])
-end
-
-function step_back!(lattice::TreeLattice, i::Int, vals::Vector{Float64}, newVals::Vector{Float64})
-  # pragma omp parallel for
-  for j = 1:get_size(lattice.impl, i)
-    val = 0.0
-    for l = 1:lattice.n
-      @inbounds val += probability(lattice.impl, i, j, l) * vals[descendant(lattice.impl, i, j, l)]
-    end
-    val *= discount(lattice.impl, i, j)
-    @inbounds newVals[j] = val
-  end
-
-  return newVals
-end
-
 type Branching{I <: Integer}
   k::Vector{I}
   probs::Vector{Vector{Float64}}
@@ -113,27 +16,6 @@ function Branching()
   probs[3] = zeros(0)
   return Branching(zeros(Int, 0), probs, typemax(Int), typemax(Int), typemin(Int), typemin(Int))
 end
-
-get_size(b::Branching) = b.jMax - b.jMin + 1
-
-function add!(branch::Branching, k::Int, p1::Float64, p2::Float64, p3::Float64)
-  push!(branch.k, k)
-  push!(branch.probs[1], p1)
-  push!(branch.probs[2], p2)
-  push!(branch.probs[3], p3)
-
-  # maintain invariants
-  branch.kMin = min(branch.kMin, k)
-  branch.jMin = branch.kMin - 1
-  branch.kMax = max(branch.kMax, k)
-  branch.jMax = branch.kMax + 1
-
-  return branch
-end
-
-descendant(b::Branching, idx::Int, branch::Int) = b.k[idx] - b.jMin - 1 + branch
-
-probability(b::Branching, idx::Int, branch::Int) = b.probs[branch][idx]
 
 type TrinomialTree{S <: StochasticProcess}
   process::S
@@ -193,7 +75,216 @@ function TrinomialTree{S <: StochasticProcess}(process::S, timeGrid::TimeGrid, i
   return TrinomialTree(process, timeGrid, dx, branchings, isPositive)
 end
 
+type TreeLattice1D{T, I <: Integer} <: TreeLattice
+  tg::TimeGrid
+  impl::T
+  statePrices::Vector{Vector{Float64}}
+  n::I
+  statePricesLimit::I
+end
+
+function TreeLattice1D{I <: Integer, T}(tg::TimeGrid, n::I, impl::T)
+  statePrices = Vector{Vector{Float64}}(1)
+  statePrices[1] = ones(1)
+
+  statePricesLimit = 1
+
+  return TreeLattice1D(tg, impl, statePrices, n, statePricesLimit)
+end
+
+type TreeLattice2D{T, I <: Integer} <: TreeLattice
+  tg::TimeGrid
+  impl::T
+  statePrices::Vector{Vector{Float64}}
+  n::I
+  statePricesLimit::I
+  tree1::TrinomialTree
+  tree2::TrinomialTree
+  m::Matrix{Float64}
+  rho::Float64
+end
+
+function TreeLattice2D{T}(tree1::TrinomialTree, tree2::TrinomialTree, correlation::Float64, impl::T)
+  tg = tree1.timeGrid
+  statePrices = Vector{Vector{Float64}}(1)
+  statePrices[1] = ones(1)
+
+  statePricesLimit = 1
+  branch_num = branches(TrinomialTree)
+  n = branch_num ^ 2
+  m = zeros(branch_num, branch_num)
+  rho = abs(correlation)
+
+  if correlation < 0.0 && branch_num == 3
+    m[1,1] = -1.0
+    m[2,1] = -4.0
+    m[3,1] =  5.0
+    m[1,2] = -4.0
+    m[2,2] =  8.0
+    m[3,2] = -4.0
+    m[1,3] =  5.0
+    m[2,3] = -4.0
+    m[3,3] = -1.0
+  else
+    m[1,1] =  5.0
+    m[2,1] = -4.0
+    m[3,1] = -1.0
+    m[1,2] = -4.0
+    m[2,2] =  8.0
+    m[3,2] = -4.0
+    m[1,3] = -1.0
+    m[2,3] = -4.0
+    m[3,3] =  5.0
+  end
+
+  return TreeLattice2D(tg, impl, statePrices, n, statePricesLimit, tree1, tree2, m, rho)
+end
+
+get_size(tr::TreeLattice2D, i::Int) = get_size(tr.tree1, i) * get_size(tr.tree2, i)
+
+function descendant(tr::TreeLattice2D, i::Int, idx::Int, branch::Int)
+  modulo = get_size(tr.tree1, i)
+  new_idx = idx - 1
+  new_branch = branch - 1
+
+  index1 = (new_idx % modulo) + 1
+  index2 = (round(Int, floor(new_idx / modulo))) + 1
+
+  branch1 = (new_branch % branches(TrinomialTree)) + 1
+  branch2 = (round(Int, floor(new_branch / branches(TrinomialTree)))) + 1
+
+  modulo = get_size(tr.tree1, i + 1)
+  return ((descendant(tr.tree1, i, index1, branch1) - 1) + (descendant(tr.tree2, i, index2, branch2) - 1) * modulo) + 1
+end
+
+function probability(tr::TreeLattice2D, i::Int, idx::Int, branch::Int)
+  modulo = get_size(tr.tree1, i)
+  new_idx = idx - 1
+  new_branch = branch - 1
+
+  index1 = (new_idx % modulo) + 1
+  index2 = (round(Int, floor(new_idx / modulo))) + 1
+
+  branch1 = (new_branch % branches(TrinomialTree)) + 1
+  branch2 = (round(Int, floor(new_branch / branches(TrinomialTree)))) + 1
+
+  # println("$(index1) $(index2) $(branch1) $(branch2) $(idx) $(branch) $(modulo)")
+
+  prob1 = probability(tr.tree1, i, index1, branch1)
+  prob2 = probability(tr.tree2, i, index2, branch2)
+
+  # println("$(prob1) $(prob2)")
+
+  return prob1 * prob2 + tr.rho * tr.m[branch2,branch1] / 36.0 # this 36 could depend on the branches(TrinomialTree)
+end
+
+function get_state_prices!(t::TreeLattice, i::Int)
+  if i > t.statePricesLimit
+    compute_state_prices!(t, i)
+  end
+
+  return t.statePrices[i]
+end
+
+function compute_state_prices!(t::TreeLattice, until::Int)
+  @simd for i = t.statePricesLimit:until - 1
+    push!(t.statePrices, zeros(get_size(t.impl, i + 1)))
+    for j = 1:get_size(t.impl, i)
+      disc = discount(t.impl, i, j)
+      @inbounds statePrice = t.statePrices[i][j]
+      for l = 1:t.n
+        @inbounds t.statePrices[i + 1][descendant(t.impl, i, j, l)] += statePrice * disc * probability(t.impl, i, j, l)
+      end
+    end
+  end
+
+  t.statePricesLimit = until
+
+  return t
+end
+
+function initialize!(lattice::TreeLattice, asset::DiscretizedAsset, t::Float64)
+  i = findfirst(lattice.tg.times .>= t)
+  set_time!(asset, t)
+  reset!(asset, get_size(lattice.impl, i))
+end
+
+function rollback!(lattice::TreeLattice, asset::DiscretizedAsset, t::Float64)
+  partial_rollback!(lattice, asset, t)
+  adjust_values!(asset)
+
+  return asset
+end
+
+function partial_rollback!(lattice::TreeLattice, asset::DiscretizedAsset, t::Float64)
+  from = asset.common.time
+
+  if QuantJulia.Math.is_close(from, t)
+    return
+  end
+
+  iFrom = findfirst(lattice.tg.times .>= from)
+  iTo = findfirst(lattice.tg.times .>= t)
+
+  @simd for i = iFrom-1:-1:iTo
+    newVals = zeros(get_size(lattice.impl, i))
+    step_back!(lattice, i, asset.common.values, newVals)
+    @inbounds asset.common.time = lattice.tg.times[i]
+    asset.common.values = newVals
+    if i != iTo
+      adjust_values!(asset)
+    end
+  end
+
+  return asset
+end
+
+function present_value(lattice::TreeLattice, asset::DiscretizedAsset)
+  if isa(lattice, TreeLattice2D)
+    println(asset.common.values[end])
+    println(length(asset.common.values))
+    println(lattice.rho)
+  end
+  i = findfirst(lattice.tg.times .>= asset.common.time)
+  return dot(asset.common.values, get_state_prices!(lattice, i))
+end
+
+function step_back!(lattice::TreeLattice, i::Int, vals::Vector{Float64}, newVals::Vector{Float64})
+  # pragma omp parallel for
+  for j = 1:get_size(lattice.impl, i)
+    val = 0.0
+    for l = 1:lattice.n
+      @inbounds val += probability(lattice.impl, i, j, l) * vals[descendant(lattice.impl, i, j, l)]
+    end
+    val *= discount(lattice.impl, i, j)
+    @inbounds newVals[j] = val
+  end
+
+  return newVals
+end
+
+get_size(b::Branching) = b.jMax - b.jMin + 1
+
+function add!(branch::Branching, k::Int, p1::Float64, p2::Float64, p3::Float64)
+  push!(branch.k, k)
+  push!(branch.probs[1], p1)
+  push!(branch.probs[2], p2)
+  push!(branch.probs[3], p3)
+
+  # maintain invariants
+  branch.kMin = min(branch.kMin, k)
+  branch.jMin = branch.kMin - 1
+  branch.kMax = max(branch.kMax, k)
+  branch.jMax = branch.kMax + 1
+
+  return branch
+end
+
+descendant(b::Branching, idx::Int, branch::Int) = b.k[idx] - b.jMin - 1 + branch
+probability(b::Branching, idx::Int, branch::Int) = b.probs[branch][idx]
+branches(::Type{TrinomialTree}) = 3
 get_size{I <: Integer}(t::TrinomialTree, i::I) = i == 1 ? 1 : get_size(t.branchings[i-1])
+
 function get_underlying(t::TrinomialTree, i::Int, idx::Int)
   if i == 1
     return t.process.x0

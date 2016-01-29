@@ -17,8 +17,6 @@ end
 
 get_size{I <: Integer}(tr::OneFactorShortRateTree, i::I) = get_size(tr.tree, i)
 
-get_state_prices!(tree::OneFactorShortRateTree, i::Int) = get_state_prices!(tree.treeLattice, i)
-
 function discount(tr::OneFactorShortRateTree, i::Int, idx::Int)
   x = get_underlying(tr.tree, i, idx)
   r = short_rate(tr.dynamics, tr.tg.times[i], x)
@@ -87,14 +85,6 @@ HullWhiteDynamics{P <: Parameter}(fitting::P, a::Float64, sigma::Float64) = Hull
 short_rate(dynamic::HullWhiteDynamics, t::Float64, x::Float64) = x + dynamic.fitting(t)
 
 generate_arguments!(m::HullWhite) = m.phi = HullWhiteFittingParameter(get_a(m), get_sigma(m), m.ts)
-
-function notify_observers!(m::OneFactorModel)
-  for obsv in m.common.observers
-    update!(obsv)
-  end
-
-  return m
-end
 
 type BlackKarasinskiDynamics{P <: Parameter} <: ShortRateDynamics
   process::OrnsteinUhlenbeckProcess

@@ -135,18 +135,18 @@ function main()
   # ATM Bermudan swaption pricing
   println(@sprintf("Payer bermudan swaption struk at %.6f %% (ATM)", fixedATMRate))
 
-  # swapLeg = swap.legs[1] # Fixed Leg
-  #
-  # bermudanDates = Vector{Date}(length(swapLeg.coupons))
-  # for i=1:length(swapLeg.coupons)
-  #   bermudanDates[i]  = accrual_start_date(swapLeg.coupons[i])
-  # end
-  #
-  # bermudanExercise = BermudanExercise(bermudanDates)
-  #
-  # bermudanSwaption = Swaption(atmSwap, bermudanExercise)
-  #
-  # update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(modelG2, 50))
-  #
-  # println(@sprintf("G2 (tree):       %.6f", npv(bermudanSwaption)))
+  swapLeg = swap.legs[1] # Fixed Leg
+
+  bermudanDates = Vector{Date}(length(swapLeg.coupons))
+  for i=1:length(swapLeg.coupons)
+    bermudanDates[i]  = accrual_start_date(swapLeg.coupons[i])
+  end
+
+  bermudanExercise = BermudanExercise(bermudanDates)
+
+  bermudanSwaption = Swaption(atmSwap, bermudanExercise)
+
+  update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(modelG2, 50))
+
+  println(@sprintf("G2 (tree):       %.6f", npv(bermudanSwaption)))
 end
