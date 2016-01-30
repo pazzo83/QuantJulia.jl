@@ -63,7 +63,7 @@ type DiscretizedSwaption{E <: Exercise} <: DiscretizedOption
 end
 
 function DiscretizedSwaption{DC <: DayCount}(swaption::Swaption, referenceDate::Date, dc::DC)
-  dates = swaption.exercise.dates
+  dates = copy(swaption.exercise.dates)
   fixed_coups = swaption.swap.legs[1].coupons
   floating_coups = swaption.swap.legs[2].coupons
   nominal = swaption.swap.nominal
@@ -75,10 +75,10 @@ function DiscretizedSwaption{DC <: DayCount}(swaption::Swaption, referenceDate::
   # fixedResetDates = get_reset_dates(fixed_coups)
   # floatingPayDates = get_pay_dates(floating_coups)
   # floatingResetDates = get_reset_dates(floating_coups)
-  fixedPayDates = swaption.swap.args.fixedPayDates
-  fixedResetDates = swaption.swap.args.fixedResetDates
-  floatingPayDates = swaption.swap.args.floatingPayDates
-  floatingResetDates = swaption.swap.args.floatingResetDates
+  fixedPayDates = copy(swaption.swap.args.fixedPayDates)
+  fixedResetDates = copy(swaption.swap.args.fixedResetDates)
+  floatingPayDates = copy(swaption.swap.args.floatingPayDates)
+  floatingResetDates = copy(swaption.swap.args.floatingResetDates)
 
   for i = 1:n
     exerciseTimes[i] = year_fraction(dc, referenceDate, dates[i])
@@ -100,7 +100,7 @@ function DiscretizedSwaption{DC <: DayCount}(swaption::Swaption, referenceDate::
     end
 
     for j = 1:length(floating_coups)
-      @inbounds if within_previous_week(exerciseDate, floatingResetDates[i])
+      @inbounds if within_previous_week(exerciseDate, floatingResetDates[j])
         @inbounds floatingResetDates[j] = exerciseDate
       end
     end

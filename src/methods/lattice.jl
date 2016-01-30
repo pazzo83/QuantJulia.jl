@@ -240,11 +240,6 @@ function partial_rollback!(lattice::TreeLattice, asset::DiscretizedAsset, t::Flo
 end
 
 function present_value(lattice::TreeLattice, asset::DiscretizedAsset)
-  if isa(lattice, TreeLattice2D)
-    println(asset.common.values[end])
-    println(length(asset.common.values))
-    println(lattice.rho)
-  end
   i = findfirst(lattice.tg.times .>= asset.common.time)
   return dot(asset.common.values, get_state_prices!(lattice, i))
 end
