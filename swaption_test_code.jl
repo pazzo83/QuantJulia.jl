@@ -1,4 +1,4 @@
-include("src/QuantJulia.jl")
+# include("src/QuantJulia.jl")
 using QuantJulia
 
 const numRows = 5
@@ -133,7 +133,8 @@ function main()
   println(@sprintf("a = %.6f, sigma = %.6f", get_params(blackKarasinski)[1], get_params(blackKarasinski)[2]))
 
   # ATM Bermudan swaption pricing
-  println(@sprintf("Payer bermudan swaption struk at %.6f %% (ATM)", fixedATMRate))
+  println("")
+  println(@sprintf("Payer bermudan swaption struck at %.6f %% (ATM)", fixedATMRate * 100.0))
 
   swapLeg = swap.legs[1] # Fixed Leg
 
@@ -149,4 +150,8 @@ function main()
   update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(modelG2, 50))
 
   println(@sprintf("G2 (tree):       %.6f", npv(bermudanSwaption)))
+
+  update_pricing_engine!(bermudanSwaption, FdG2SwaptionEngine(modelG2))
+
+  npv(bermudanSwaption)
 end

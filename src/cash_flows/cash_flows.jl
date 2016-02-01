@@ -44,6 +44,15 @@ date_accrual_end(cf::SimpleCashFlow) = cf.date
 date{C <: Coupon}(coup::C) = coup.paymentDate
 date_accrual_end{C <: Coupon}(coup::C) = accrual_end_date(coup)
 
+type Dividend <: CashFlow
+  amount::Float64
+  date::Date
+end
+
+amount(div::Dividend) = div.amount
+date(div::Dividend) = div.date
+date_accrual_end(div::Dividend) = div.date
+
 # legs to build cash flows
 abstract Leg <: CashFlows
 

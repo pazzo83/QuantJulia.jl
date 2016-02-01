@@ -1,5 +1,11 @@
 using QuantJulia.Time
 
+type DividendSchedule
+  dividends::Vector{Dividend}
+end
+
+DividendSchedule() = DividendSchedule(Vector{Dividend}(0))
+
 type BondMixin{I <: Integer}
   settlementDays::I
   # schedule::Schedule

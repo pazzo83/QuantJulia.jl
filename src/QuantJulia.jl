@@ -38,7 +38,7 @@ export
 
     Exercise, EarlyExercise, CompoundingType, TermStructure, YieldTermStructure, InterpolatedCurve, BootstrapTrait, Bootstrap, BootstrapHelper, BondHelper, RateHelper,
     FittingMethod, CashFlows, CashFlow, Coupon, CouponPricer, IborCouponPricer, Instrument, Bond, Swap, SwapType, PricingEngine, Duration, AbstractRate, Results,
-    InterestRateIndex, AbstractCurrency, Parameter, CalibrationHelper, ShortRateModel,
+    InterestRateIndex, AbstractCurrency, Parameter, CalibrationHelper, ShortRateModel, FdmMesher,
 
     # lazy.jl
     LazyMixin, calculate!, recalculate!,
@@ -122,6 +122,7 @@ export
     # models/parameter.jl
     ConstantParameter, G2FittingParameter, HullWhiteFittingParameter,
 
+
     # models/calibration_helpers.jl
     SwaptionHelper, implied_volatility!, add_times_to!, model_value!,
 
@@ -134,6 +135,9 @@ export
     # models/short_rate/one_factor.jl
     BlackKarasinski, HullWhite,
 
+    # methods - finite difference
+    FdmG2Solver,
+
     # pricing_engines/pricing_engines.jl
     DiscountingBondEngine, DiscountingSwapEngine,
 
@@ -141,7 +145,7 @@ export
     DiscretizedSwaption, DiscretizedSwap,
 
     # pricing_engines/swaption_engines.jl
-    G2SwaptionEngine, JamshidianSwaptionEngine, TreeSwaptionEngine, calculate
+    G2SwaptionEngine, JamshidianSwaptionEngine, TreeSwaptionEngine, FdG2SwaptionEngine
 
 # abstract types
 include("abstract_types.jl")
@@ -207,6 +211,9 @@ include("models/calibration_helpers.jl")
 include("models/short_rate/short_rate.jl")
 include("models/short_rate/two_factor.jl")
 include("models/short_rate/one_factor.jl")
+
+# Finite Difference method
+include("methods/finite_differences.jl")
 
 # Pricing Engines ------------------------
 include("pricing_engines/pricing_engines.jl")

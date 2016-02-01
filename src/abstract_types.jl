@@ -8,6 +8,11 @@ abstract StochasticProcess1D <: StochasticProcess
 # Methods
 abstract Lattice
 abstract TreeLattice <: Lattice
+abstract FdmSchemeDescType
+abstract FdmMesher
+abstract Fdm1DMesher
+abstract StepCondition
+abstract FdmInnerValueCalculator
 
 # Exercise
 abstract Exercise
@@ -60,7 +65,8 @@ abstract InterestRateIndex
 abstract Parameter
 abstract CalibrationErrorType
 abstract CalibrationHelper <: LazyObject
-abstract ShortRateModel
+abstract Model
+abstract ShortRateModel <: Model
 abstract OneFactorModel <: ShortRateModel
 abstract TwoFactorModel <: ShortRateModel
 abstract ShortRateDynamics

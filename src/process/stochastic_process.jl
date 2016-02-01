@@ -18,3 +18,10 @@ function variance(process::OrnsteinUhlenbeckProcess, ::Float64, ::Float64, dt::F
     return 0.5 * v * v / process.speed * (1.0 - exp(-2.0 * process.speed * dt))
   end
 end
+
+std_deviation(process::OrnsteinUhlenbeckProcess, t::Float64, x0::Float64, dt::Float64) = sqrt(variance(process, t, x0, dt))
+
+evolve(process::StochasticProcess1D, t0::Float64, x0::Float64, dt::Float64, dw::Float64) =
+      apply(process, expectation(process, t0, x0, dt), std_deviation(process, t0, x0, dt) * dw)
+
+apply(process::StochasticProcess1D, x0::Float64, dx::Float64) = x0 + dx
