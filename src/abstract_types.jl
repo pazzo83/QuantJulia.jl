@@ -13,6 +13,8 @@ abstract FdmMesher
 abstract Fdm1DMesher
 abstract StepCondition
 abstract FdmInnerValueCalculator
+abstract FdmLinearOpComposite
+abstract NinePointLinearOp
 
 # Exercise
 abstract Exercise
