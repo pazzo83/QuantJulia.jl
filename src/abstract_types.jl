@@ -67,10 +67,11 @@ abstract InterestRateIndex
 abstract Parameter
 abstract CalibrationErrorType
 abstract CalibrationHelper <: LazyObject
-abstract Model
-abstract ShortRateModel <: Model
-abstract OneFactorModel <: ShortRateModel
-abstract TwoFactorModel <: ShortRateModel
+abstract ModelType
+abstract Model{T <: ModelType}
+abstract ShortRateModel{T} <: Model{T}
+abstract OneFactorModel{T} <: ShortRateModel{T}
+abstract TwoFactorModel{T} <: ShortRateModel{T}
 abstract ShortRateDynamics
 abstract ShortRateTree
 

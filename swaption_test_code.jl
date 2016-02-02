@@ -1,4 +1,4 @@
-# include("src/QuantJulia.jl")
+include("src/QuantJulia.jl")
 using QuantJulia
 
 const numRows = 5

@@ -25,20 +25,24 @@ discount{T <: YieldTermStructure}(yts::T, date::Date) = discount(yts, time_from_
 
 function discount{T <: YieldTermStructure}(yts::T, time_frac::Float64)
   disc = discount_impl(yts, time_frac)
-  if length(yts.jumpTimes) == 0
-    return disc
-  end
+  if isdefined(yts, :jumpTimes)
+    if length(yts.jumpTimes) == 0
+      return disc
+    end
 
-  jump_effect = 1.0
-  for jump in yts.jumpTimes
-    if jump.ts_time > 0.0 && jump.ts_time < time
-      if jump.ts_quote.value > 0.0 && jump.ts_quote.value <= 1.0
-        jump_effect *= jump.ts_quote.value
+    jump_effect = 1.0
+    for jump in yts.jumpTimes
+      if jump.ts_time > 0.0 && jump.ts_time < time
+        if jump.ts_quote.value > 0.0 && jump.ts_quote.value <= 1.0
+          jump_effect *= jump.ts_quote.value
+        end
       end
     end
-  end
 
-  return jump_effect * disc
+    return jump_effect * disc
+  else
+    return disc
+  end
 end
 
 function zero_rate{T <: YieldTermStructure, C <: CompoundingType, F <: Frequency}(yts::T, date::Date, dc::DayCount, comp::C, freq::F)

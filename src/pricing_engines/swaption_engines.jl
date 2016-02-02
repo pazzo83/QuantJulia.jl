@@ -13,10 +13,12 @@ end
 BlackSwaptionEngine{Y <: YieldTermStructure, DC <: DayCount}(yts::Y, vol::Quote, dc::DC, displacement::Float64 = 0.0) =
                     BlackSwaptionEngine(yts, vol, ConstantSwaptionVolatility(0, QuantJulia.Time.NullCalendar(), QuantJulia.Time.Following(), vol, dc), dc, displacement)
 
-type G2SwaptionEngine{Y <: YieldTermStructure, I <: Integer} <: PricingEngine{Y}
-  model::G2{Y}
+type G2SwaptionEngine{AffineModelType, Y <: YieldTermStructure, I <: Integer} <: PricingEngine{Y}
+  model::G2{AffineModelType, Y}
   range::Float64
   intervals::I
+
+  call{Y, I}(::Type{G2SwaptionEngine}, model::G2{AffineModelType, Y}, range::Float64, intervals::I) = new{AffineModelType, Y, I}(model, range, intervals)
 end
 
 type JamshidianSwaptionEngine{S <: ShortRateModel, Y <: YieldTermStructure} <: PricingEngine{Y}
@@ -302,7 +304,7 @@ function _calculate!(pe::FdG2SwaptionEngine, swaption::Swaption)
   fwdTs = swaption.swap.iborIndex.ts
 
   fwdModel = G2(fwdTs, get_a(pe.model), get_sigma(pe.model), get_b(pe.model), get_eta(pe.model), get_rho(pe.model))
-  calculator = FdmAffineModelSwapInnerValue(pe.model, fwdModel, swaption.swap, t2d, mesher, 0)
+  calculator = FdmAffineModelSwapInnerValue(pe.model, fwdModel, swaption.swap, t2d, mesher, 1)
 
   # 4. Step Conditions
   conditions = vanilla_FdmStepConditionComposite(DividendSchedule(), swaption.exercise, mesher, calculator, refDate, dc)

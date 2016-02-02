@@ -59,7 +59,8 @@ G2Dynamics{P <: Parameter}(fitting::P, a::Float64, sigma::Float64, b::Float64, e
 
 short_rate(dyn::G2Dynamics, t::Float64, x::Float64, y::Float64) = dyn.fitting(t) + x + y
 
-type G2{T <: TermStructure} <: TwoFactorModel
+type G2{AffineModelType, T <: TermStructure} <: TwoFactorModel{AffineModelType}
+  modT::AffineModelType
   a::ConstantParameter
   sigma::ConstantParameter
   b::ConstantParameter
@@ -82,7 +83,7 @@ function G2{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 = 0.01, 
 
   phi = G2FittingParameter(a, sigma, b, eta, rho, ts)
 
-  return G2(a_const, sigma_const, b_const, eta_const, rho_const, phi, ts, privateConstraint, ShortRateModelCommon())
+  return G2{AffineModelType, T}(AffineModelType(), a_const, sigma_const, b_const, eta_const, rho_const, phi, ts, privateConstraint, ShortRateModelCommon())
 end
 
 get_eta(m::G2) = m.eta.data[1]
@@ -216,3 +217,6 @@ function gen_swaption{I <: Integer}(model::G2, swaption::Swaption, fixedRate::Fl
   integrator = SegmentIntegral(intervals)
   return swaption.swap.nominal * w * discount(model.ts, startTime) * QuantJulia.Math.operator(integrator, QuantJulia.operator(func), lower, upper)
 end
+
+discount_bond(model::G2, t::Float64, T::Float64, x::Float64, y::Float64) = A(model, t, T) * exp(-B(model, get_a(model), (T - t)) * x - B(model, get_b(model), (T - t)) * y)
+discount_bond(model::G2, now::Float64, maturity::Float64, factors::Vector{Float64}) = discount_bond(model, now, maturity, factors[1], factors[2])

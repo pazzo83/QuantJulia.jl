@@ -111,7 +111,14 @@ function FdmBermudanStepCondition(exerciseDates::Vector{Date}, refDate::Date, dc
   return FdmBermudanStepCondition(mesher, calculator, exerciseTimes)
 end
 
-type FdmStepConditionComposite{C <: StepCondition}
+type FdmSnapshotCondition <: StepCondition
+  t::Float64
+  a::Vector{Float64}
+end
+
+FdmSnapshotCondition(t::Float64) = FdmSnapshotCondition(t, Vector{Float64}(0))
+
+type FdmStepConditionComposite{C <: StepCondition} <: StepCondition
   stoppingTimes::Vector{Float64}
   conditions::Vector{C}
 end
@@ -137,6 +144,17 @@ function vanilla_FdmStepConditionComposite(cashFlow::DividendSchedule, exercise:
   end
 
   return FdmStepConditionComposite(stoppingTimes, stepConditions)
+end
+
+function join_conditions_FdmStepConditionComposite(c1::FdmSnapshotCondition, c2::FdmStepConditionComposite)
+  stoppingTimes = c2.stoppingTimes
+  push!(stoppingTimes, c1.t)
+
+  conditions = Vector{StepCondition}(2)
+  conditions[1] = c2
+  conditions[2] = c1
+
+  return FdmStepConditionComposite(stoppingTimes, conditions)
 end
 
 type FdmMesherComposite{FM1D <: Fdm1DMesher} <: FdmMesher
@@ -175,26 +193,97 @@ function get_locations(mesher::FdmMesherComposite, direction::Int)
   return retVal
 end
 
+get_location{I <: Integer}(mesher::FdmMesherComposite, coords::Vector{I}, direction::I) = mesher.meshers[direction].locations[coords[direction]]
+
 get_dminus{I <: Integer}(mesher::FdmMesherComposite, coords::Vector{I}, direction::I) = mesher.meshers[direction].dminus[coords[direction]]
 get_dplus{I <: Integer}(mesher::FdmMesherComposite, coords::Vector{I}, direction::I) = mesher.meshers[direction].dplus[coords[direction]]
 
-type FdmAffineModelSwapInnerValue{T1 <: TermStructure, T2 <: TermStructure, M1 <: Model, M2 <: Model, FM <: FdmMesher, I <: Integer} <: FdmInnerValueCalculator
-  disTs::T1
-  fwdTs::T2
+type FdmAffineModelTermStructure{I <: Integer, B <: BusinessCalendar, DC <: DayCount, A <: AffineModel} <: YieldTermStructure
+  settlement_days::I
+  referenceDate::Date
+  calendar::B
+  dc::DC
+  modelReferenceDate::Date
+  model::A
+  r::Vector{Float64}
+  t::Float64
+end
+
+FdmAffineModelTermStructure{B <: BusinessCalendar, DC <: DayCount, A <: AffineModel}(referenceDate::Date, cal::B, dc::DC, modelReferenceDate::Date, model::A, r::Vector{Float64}) =
+                            FdmAffineModelTermStructure{Int, B, DC, A}(0, referenceDate, cal, dc, modelReferenceDate, model, r, year_fraction(dc, modelReferenceDate, referenceDate))
+
+discount_impl(ts::FdmAffineModelTermStructure, T::Float64) = discount_bond(ts.model, ts.t, T + ts.t, ts.r)
+
+set_variable(ts::FdmAffineModelTermStructure, r::Vector{Float64}) = ts.r = r
+
+type FdmAffineModelSwapInnerValue{M1 <: Model, M2 <: Model, FM <: FdmMesher, I <: Integer} <: FdmInnerValueCalculator
   disModel::M1
   fwdModel::M2
   swap::VanillaSwap
   exerciseDates::Dict{Float64, Date}
   mesher::FM
   direction::I
+  disTs::FdmAffineModelTermStructure
+  fwdTs::FdmAffineModelTermStructure
+
+  function FdmAffineModelSwapInnerValue{M1, M2, FM, I}(disModel::M1, fwdModel::M2, swap::VanillaSwap, exerciseDates::Dict{Float64, Date}, mesher::FM, direction::I)
+    idx = swap.iborIndex
+    newIbor = IborIndex(idx.familyName, idx.tenor, idx.fixingDays, idx.currency, idx.fixingCalendar, idx.convention, idx.endOfMonth, idx.dc)
+    newSwap = VanillaSwap(swap.swapT, swap.nominal, swap.fixedSchedule, swap.fixedRate, swap.fixedDayCount, newIbor, swap.spread, swap.floatSchedule,
+                          swap.floatDayCount, swap.pricingEngine, swap.paymentConvention)
+
+    return new{M1, M2, FM, I}(disModel, fwdModel, newSwap, exerciseDates, mesher, direction)
+  end
 end
 
-function FdmAffineModelSwapInnerValue(disModel::Model, fwdModel::Model, swap::VanillaSwap, exerciseDates::Dict{Float64, Date}, mesher::FdmMesher, direction::Int)
-  newSwap = VanillaSwap(swap.swapT, swap.nominal, swap.fixedSchedule, swap.fixedRate, swap.fixedDayCount, swap.iborIndex, swap.spread, swap.floatSchedule,
-                        swap.floatDayCount, swap.pricingEngine, swap.paymentConvention)
+FdmAffineModelSwapInnerValue{M1 <: Model, M2 <: Model, FM <: FdmMesher, I <: Integer}(disModel::M1, fwdModel::M2, swap::VanillaSwap, exerciseDates::Dict{Float64, Date}, mesher::FM, direction::I) =
+                            FdmAffineModelSwapInnerValue{M1, M2, FM, I}(disModel, fwdModel, swap, exerciseDates, mesher, direction)
 
-  return FdmAffineModelSwapInnerValue(disModel.ts, fwdModel.ts, disModel, fwdModel, newSwap, exerciseDates, mesher, direction)
+function get_state{I <: Integer}(::G2, calc::FdmAffineModelSwapInnerValue, coords::Vector{I}, ::Float64)
+  retVal = Vector{Float64}(2)
+  retVal[1] = get_location(calc.mesher, coords, calc.direction)
+  retVal[2] = get_location(calc.mesher, coords, calc.direction + 1)
+
+  return retVal
 end
+
+function inner_value{I <: Integer}(calc::FdmAffineModelSwapInnerValue, coords::Vector{I}, i::I, t::Float64)
+  iterExerciseDate = get(calc.exerciseDates, t, Date())
+  disRate = get_state(calc.disModel, calc, coords, t)
+  fwdRate = get_state(calc.fwdModel, calc, coords, t)
+
+  if !isdefined(calc, :disTs) || iterExerciseDate != reference_date(calc.disTs)
+    disc = calc.disModel.ts
+    calc.disTs = FdmAffineModelTermStructure(iterExerciseDate, disc.calendar, disc.dc, reference_date(disc), calc.disModel, disRate)
+    fwd = calc.fwdModel.ts
+    calc.fwdTs = FdmAffineModelTermStructure(iterExerciseDate, fwd.calendar, fwd.dc, reference_date(fwd), calc.fwdModel, fwdRate)
+    # probably should put this in something more logical
+    calc.swap.iborIndex.ts = calc.fwdTs
+  else
+    # do some updating
+    set_variable(calc.disTs, disRate)
+    set_variable(calc.fwdTs, fwdRate)
+  end
+
+  npv = 0.0
+  for j = 1:2
+    for i = 1:length(calc.swap.legs[j].coupons)
+      cf = calc.swap.legs[j].coupons[i]
+      if isa(cf, Coupon)
+        npv += accrual_start_date(cf) >= iterExerciseDate ? amount(cf) * discount(calc.disTs, date(cf)) : 0.0
+      end
+    end
+    if j == 1
+      npv *= -1.0
+    end
+  end
+  if isa(calc.swap.swapT, Receiver)
+    npv *= -1.0
+  end
+  return max(0.0, npv)
+end
+
+avg_inner_value{I <: Integer}(calc::FdmAffineModelSwapInnerValue, coords::Vector{I}, i::I, t::Float64) = inner_value(calc, coords, i, t)
 
 type Hundsdorfer <: FdmSchemeDescType end
 
@@ -614,12 +703,110 @@ type FdmSolverDesc{F <: FdmMesher, C <: FdmInnerValueCalculator, I <: Integer}
   dampingSteps::I
 end
 
-# Not done
-type Fdm2DimSolver{FD <: FdmLinearOpComposite}
+type HundsdorferScheme
+  theta::Float64
+  mu::Float64
+  map::FdmLinearOpLayout
+  bcSet::FdmBoundaryConditionSet
+  dt::Float64
+end
+
+HundsdorferScheme(theta::Float64, mu::Float64, map::FdmLinearOpLayout, bcSet::FdmBoundaryConditionSet) = HundsdorferScheme(theta, mu, map, bcSet, 0.0)
+
+type FiniteDifferenceModel{T}
+  evolver::T
+  stoppingTimes::Vector{Float64}
+
+  FiniteDifferenceModel{T}(evolver::T, stoppingTimes::Vector{Float64}) = new(evolver, sort(unique(stoppingTimes)))
+end
+
+type FdmBackwardSolver
+  map::FdmLinearOpComposite
+  bcSet::FdmBoundaryConditionSet
+  condition::FdmStepConditionComposite
+  schemeDesc::FdmSchemeDesc
+end
+
+function FdmBackwardSolver(map::FdmLinearOpComposite, bcSet::FdmBoundaryConditionSet, schemeDesc::FdmSchemeDesc)
+  condition = FdmStepConditionComposite(Vector{Float64}(), Vector{StepCondition}())
+
+  return FdmBackwardSolver(map, bcSet, condition, schemeDesc)
+end
+
+function rollback!(bsolv::FdmBackwardSolver, schemeType::Hundsdorfer, rhs::Vector{Float64}, from::Float64, to::Float64, steps::Int, dampingSteps::Int)
+  deltaT = from - to
+  allSteps = steps + dampingSteps
+  dampingTo = from - (deltaT * dampingSteps) / allSteps
+
+  # if dampingSteps > 0
+  #   implicitEvolver = ImplicitEulerScheme(bsolv.map, bsolv.bcSet)
+  # end
+
+  hsEvolver = HundsdorferScheme(bsolv.schemeDesc.theta, bsolv.schemeDesc.mu, bsolv.map, bsolv.bcSet)
+  hsModel = FiniteDifferenceModel{HundsdorferScheme}(hsEvolver, bsolv.condition.stoppingTimes)
+end
+
+type Fdm2DimSolver{FD <: FdmLinearOpComposite} <: LazyObject
+  lazyMixin::LazyMixin
   solverDesc::FdmSolverDesc
   schemeDesc::FdmSchemeDesc
   op::FD
+  thetaCondition::FdmSnapshotCondition
+  conditions::FdmStepConditionComposite
+  initialValues::Vector{Float64}
+  resultValues::Matrix{Float64}
+  x::Vector{Float64}
+  y::Vector{Float64}
+  # interpolation::BicubicSpline
+
+  function Fdm2DimSolver{FD}(solverDesc::FdmSolverDesc, schemeDesc::FdmSchemeDesc, op::FD)
+    thetaCondition = FdmSnapshotCondition(0.99 * min(1.0 / 365.0, length(solverDesc.condition.stoppingTimes) == 0 ? solverDesc.maturity : solverDesc.condition.stoppingTimes[1]))
+    conditions = join_conditions_FdmStepConditionComposite(thetaCondition, solverDesc.condition)
+
+    layout = solverDesc.mesher.layout
+
+    initialValues = zeros(layout.size)
+    resultValues = zeros(layout.dim[1], layout.dim[2])
+
+    x = zeros(layout.dim[1])
+    y = zeros(layout.dim[2])
+    x_count = 1
+    y_count = 1
+
+    coords = ones(Int, length(layout.dim))
+
+    for i = 1:layout.size
+      initialValues[i] = avg_inner_value(solverDesc.calculator, coords, i, solverDesc.maturity)
+
+      if coords[2] == 1
+        x[x_count] = get_location(solverDesc.mesher, coords, 1)
+        x_count += 1
+      end
+
+      if coords[1] == 1
+        y[y_count] =  get_location(solverDesc.mesher, coords, 2)
+        y_count += 1
+      end
+
+      iter_coords!(coords, layout.dim)
+    end
+
+    return new{FD}(LazyMixin(), solverDesc, schemeDesc, op, thetaCondition, conditions, initialValues, resultValues, x, y)
+  end
 end
+
+function interpolate_at(solv::Fdm2DimSolver, x::Float64, y::Float64)
+  calculate!(solv)
+  return get_interpolation(solv, x, y)
+end
+
+function perform_calculations(solv::Fdm2DimSolver)
+  rhs = copy(solv.initialValues)
+
+  bsolver = FdmBackwardSolver(solv.op, solv.solverDesc.bcSet, solv.conditions, solv.schemeDesc)
+  rollback!(bsolver, solv.schemeDesc.schemeType, rhs, solv.solverDesc.maturity, 0.0, solv.solverDesc.timeSteps, solv.solverDesc.dampingSteps)
+end
+
 
 type FdmG2Solver <: LazyObject
   lazyMixin::LazyMixin
@@ -630,7 +817,11 @@ type FdmG2Solver <: LazyObject
 
   function FdmG2Solver(model::G2, solverDesc::FdmSolverDesc, schemeDesc::FdmSchemeDesc)
     op = FdmG2Op(solverDesc.mesher, model, 1, 2)
-    solver = Fdm2DimSolver(solverDesc, schemeDesc, op)
+    solver = Fdm2DimSolver{FdmG2Op}(solverDesc, schemeDesc, op)
     new(LazyMixin(), model, solverDesc, schemeDesc, solver)
   end
 end
+
+# function value_at(solv::FdmG2Solver, x::Float64, y::Float64)
+#   return interpolate_at(solv.solver, x, y)
+# end

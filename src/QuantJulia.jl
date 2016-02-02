@@ -208,6 +208,7 @@ include("termstructures/nonlinear_fitting_methods.jl")
 # Models ---------------------------------
 include("models/parameter.jl")
 include("models/calibration_helpers.jl")
+include("models/models.jl")
 include("models/short_rate/short_rate.jl")
 include("models/short_rate/two_factor.jl")
 include("models/short_rate/one_factor.jl")

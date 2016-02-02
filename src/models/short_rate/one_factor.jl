@@ -28,7 +28,8 @@ probability(tr::OneFactorShortRateTree, i::Int, idx::Int, branch::Int) = probabi
 
 get_params(m::OneFactorModel) = Float64[get_a(m), get_sigma(m)]
 
-type BlackKarasinski{T <: TermStructure} <: OneFactorModel
+type BlackKarasinski{TermStructureConsistentModelType, T <: TermStructure} <: OneFactorModel{TermStructureConsistentModelType}
+  modT::TermStructureConsistentModelType
   a::ConstantParameter
   sigma::ConstantParameter
   ts::T
@@ -42,13 +43,14 @@ function BlackKarasinski(ts::TermStructure, a::Float64 = 0.1, sigma = 0.1)
 
   privateConstraint = PrivateConstraint(ConstantParameter[a_const, sigma_const])
 
-  return BlackKarasinski(a_const, sigma_const, ts, privateConstraint, ShortRateModelCommon())
+  return BlackKarasinski(TermStructureConsistentModelType(), a_const, sigma_const, ts, privateConstraint, ShortRateModelCommon())
 end
 
 generate_arguments!(m::BlackKarasinski) = m # do nothing
 
 
-type HullWhite{T <: TermStructure} <: OneFactorModel
+type HullWhite{TermStructureConsistentModelType, T <: TermStructure} <: OneFactorModel{TermStructureConsistentModelType}
+  modT::TermStructureConsistentModelType
   r0::Float64
   a::ConstantParameter
   sigma::ConstantParameter
@@ -68,7 +70,7 @@ function HullWhite{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 =
 
   phi  = HullWhiteFittingParameter(a, sigma, ts)
 
-  return HullWhite(r0, a_const, sigma_const, phi, ts, privateConstraint, ShortRateModelCommon())
+  return HullWhite(TermStructureConsistentModelType(), r0, a_const, sigma_const, phi, ts, privateConstraint, ShortRateModelCommon())
 end
 
 ## Dynamics ##
