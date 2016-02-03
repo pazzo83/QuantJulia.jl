@@ -56,7 +56,51 @@ function neighborhood{I <: Integer}(mesherLayout::FdmLinearOpLayout, idx::I, coo
   return myIndex + coorOffset1 * mesherLayout.spacing[i1] + coorOffset2 * mesherLayout.spacing[i2]
 end
 
-type FdmBoundaryConditionSet end
+type FdmBoundaryConditionSet
+  conditions::Vector{BoundaryCondition}
+end
+
+FdmBoundaryConditionSet() = FdmBoundaryConditionSet(Vector{BoundaryCondition}(0))
+
+function set_time!(bcSet::FdmBoundaryConditionSet, t::Float64)
+  for cond in bcSet.conditions
+    set_time!(cond, t)
+  end
+
+  return bcSet
+end
+
+function apply_before_applying!(bcSet::FdmBoundaryConditionSet, op::FdmLinearOpComposite)
+  for cond in bcSet.conditions
+    apply_before_applying!(cond, t)
+  end
+
+  return bcSet
+end
+
+function apply_after_applying!(bcSet::FdmBoundaryConditionSet, a::Vector{Float64})
+  for cond in bcSet.conditions
+    apply_after_applying!(cond, t)
+  end
+
+  return bcSet
+end
+
+function apply_before_solving!(bcSet::FdmBoundaryConditionSet, op::FdmLinearOpComposite, a::Vector{Float64})
+  for cond in bcSet.conditions
+    apply_before_solving!(cond, op, a)
+  end
+
+  return bcSet
+end
+
+function apply_after_solving!(bcSet::FdmBoundaryConditionSet, a::Vector{Float64})
+  for cond in bcSet.conditions
+    apply_after_solving!(cond, t)
+  end
+
+  return bcSet
+end
 
 type FdmDividendHandler{F <: FdmMesher, I <: Integer} <: StepCondition
   x::Vector{Float64}
@@ -111,12 +155,45 @@ function FdmBermudanStepCondition(exerciseDates::Vector{Date}, refDate::Date, dc
   return FdmBermudanStepCondition(mesher, calculator, exerciseTimes)
 end
 
+function apply_to!(cond::FdmBermudanStepCondition, a::Vector{Float64}, t::Float64)
+  if findfirst(cond.exerciseTimes, t) != 0
+    layout = cond.mesher.layout
+    dims = length(layout.dim)
+    coords = ones(Int, dims)
+
+    locations = zeros(dims)
+
+    for i = 1:layout.size
+      for j = 1:dims
+        locations[dims] = get_location(cond.mesher, coords, j)
+      end
+
+      innerValue = inner_value(cond.calculator, coords, i, t)
+      if innerValue > a[i]
+        a[i] = innerValue
+      end
+
+      iter_coords!(coords, cond.mesher.layout.dim)
+    end
+  end
+
+  return cond, a
+end
+
 type FdmSnapshotCondition <: StepCondition
   t::Float64
   a::Vector{Float64}
 end
 
 FdmSnapshotCondition(t::Float64) = FdmSnapshotCondition(t, Vector{Float64}(0))
+
+function apply_to!(cond::FdmSnapshotCondition, a::Vector{Float64}, t::Float64)
+  if cond.t == t
+    cond.a = a
+  end
+
+  return cond
+end
 
 type FdmStepConditionComposite{C <: StepCondition} <: StepCondition
   stoppingTimes::Vector{Float64}
@@ -155,6 +232,14 @@ function join_conditions_FdmStepConditionComposite(c1::FdmSnapshotCondition, c2:
   conditions[2] = c1
 
   return FdmStepConditionComposite(stoppingTimes, conditions)
+end
+
+function apply_to!(cond::FdmStepConditionComposite, a::Vector{Float64}, t::Float64)
+  for c in cond.conditions
+    apply_to!(c, a, t)
+  end
+
+  return cond, a
 end
 
 type FdmMesherComposite{FM1D <: Fdm1DMesher} <: FdmMesher
@@ -502,6 +587,84 @@ function add!(trpBandLinOp::TripleBandLinearOp, m::TripleBandLinearOp)
   return trpBandLinOp
 end
 
+function axpyb!(trpBandLinOp::TripleBandLinearOp, a::Vector{Float64}, x::TripleBandLinearOp, y::TripleBandLinearOp, b::Vector{Float64})
+  sz = trpBandLinOp.mesher.layout.size
+
+  if length(a) == 0
+    if length(b) == 0
+      trpBandLinOp._diag[1:sz] = y._diag
+      trpBandLinOp.lower[1:sz] = y.lower
+      trpBandLinOp.upper[1:sz] = y.upper
+    else
+      addB = length(b) > 0 ? b[1:sz] : b[1]
+      trpBandLinOp._diag[1:sz] = y._diag + addB
+      trpBandLinOp.lower[1:sz] = y.lower
+      trpBandLinOp.upper[1:sz] = y.upper
+    end
+  elseif length(b) == 0
+    # this might be improved
+    trpBandLinOp._diag[1:sz] = y._diag + (length(a) > 0 ? a .* x._diag : a[1] * x._diag)
+    trpBandLinOp.lower[1:sz] = y.lower + (length(a) > 0 ? a .* x.lower : a[1] * x.lower)
+    trpBandLinOp.upper[1:sz] = y.upper + (length(a) > 0 ? a .* x.upper : a[1] * x.upper)
+  else
+    addB = length(b) > 0 ? b[1:sz] : b[1]
+    trpBandLinOp._diag[1:sz] = y._diag + (length(a) > 0 ? a .* x._diag : a[1] * x._diag) + addB
+    trpBandLinOp.lower[1:sz] = y.lower + (length(a) > 0 ? a .* x.lower : a[1] * x.lower)
+    trpBandLinOp.upper[1:sz] = y.upper + (length(a) > 0 ? a .* x.upper : a[1] * x.upper)
+  end
+
+  return trpBandLinOp
+end
+
+function apply(trpBandLinOp::TripleBandLinearOp, r::Vector{Float64})
+  idx = trpBandLinOp.mesher.layout
+  length(r) == idx.size || error("inconsistent length of r")
+
+  retArray = Vector{Float64}(length(r))
+
+  for i = 1:idx.size
+    retArray[i] = r[trpBandLinOp.i0[i]] * trpBandLinOp.lower[i] + r[i] * trpBandLinOp._diag[i] + r[trpBandLinOp.i2[i]] * trpBandLinOp.upper[i]
+  end
+
+  return retArray
+end
+
+function solve_splitting(trpBandLinOp::TripleBandLinearOp, r::Vector{Float64}, a::Float64, b::Float64)
+  layout = trpBandLinOp.mesher.layout
+  length(r) == layout.size || error("inconsistent length of r")
+
+  retArray = Vector{Float64}(length(r))
+  tmp = Vector{Float64}(length(r))
+
+  # solving a tridiagonal system (we could use Julia built in f'ns here)
+  rim1 = trpBandLinOp.reverseIndex[1]
+  bet = 1.0 / (a * trpBandLinOp._diag[rim1] + b)
+  bet != 0.0 || error("division by zero")
+
+  retArray[rim1] = r[rim1] * bet
+
+  for j = 2:layout.size
+    ri = trpBandLinOp.reverseIndex[j]
+    tmp[j] = a * trpBandLinOp.upper[rim1] * bet
+
+    bet = b + a * (trpBandLinOp._diag[ri] - tmp[j] * trpBandLinOp.lower[ri])
+    bet != 0.0 || error("division by zero")
+
+    bet = 1.0 / bet
+
+    retArray[ri] = (r[ri] - a * trpBandLinOp.lower[ri] * retArray[rim1]) * bet
+    rim1 = ri
+  end
+
+  for j = layout.size - 1:-1:2
+    retArray[trpBandLinOp.reverseIndex[j]] -= tmp[j + 1] * retArray[trpBandLinOp.reverseIndex[j + 1]]
+  end
+
+  retArray[trpBandLinOp.reverseIndex[1]] -= tmp[2] * retArray[trpBandLinOp.reverseIndex[2]]
+
+  return retArray
+end
+
 type SecondOrderMixedDerivativeOp{I <: Integer, FD <: FdmMesher} <: NinePointLinearOp
   d1::I
   d2::I
@@ -661,6 +824,16 @@ function mult!{T <: Number}(ninePointLin::NinePointLinearOp, u::Vector{T})
   return ninePointLin
 end
 
+function apply(ninePointLin::NinePointLinearOp, u::Vector{Float64})
+  length(u) == ninePointLin.mesher.layout.size || error("inconsistent length of r")
+
+  retVal = ninePointLin.a00 .* u[ninePointLin.i00] + ninePointLin.a01 .* u[ninePointLin.i01] + ninePointLin.a02 .* u[ninePointLin.i02] + ninePointLin.a10 .* u[ninePointLin.i10] +
+          ninePointLin.a11 .* u + ninePointLin.a12 .* u[ninePointLin.i12] + ninePointLin.a20 .* u[ninePointLin.i20] + ninePointLin.a21 .* u[ninePointLin.i21] +
+          ninePointLin.a22 .* u[ninePointLin.i22]
+
+  return retVal
+end
+
 type FdmG2Op{I <: Integer} <: FdmLinearOpComposite
   direction1::I
   direction2::I
@@ -692,6 +865,43 @@ function FdmG2Op(mesher::FdmMesher, model::G2, direction1::Int, direction2::Int)
   return FdmG2Op(direction1, direction2, x, y, dxMap, dyMap, corrMap, mapX, mapY, model)
 end
 
+function set_time!(op::FdmG2Op, t1::Float64, t2::Float64)
+  dynamics = get_dynamics(op.model)
+
+  phi = 0.5 * (short_rate(dynamics, t1, 0.0, 0.0) + short_rate(dynamics, t2, 0.0, 0.0))
+
+  hr = -0.5 * (op.x + op.y + phi)
+  axpyb!(op.mapX, Vector{Float64}(0), op.dxMap, op.dxMap, hr)
+  axpyb!(op.mapY, Vector{Float64}(0), op.dyMap, op.dyMap, hr)
+
+  return op
+end
+
+function apply_direction(op::FdmG2Op, direction::Int, r::Vector{Float64})
+  if direction == op.direction1
+    return apply(op.mapX, r)
+  elseif direction == op.direction2
+    return apply(op.mapY, r)
+  else
+    return zeros(length(r))
+  end
+end
+
+function solve_splitting(op::FdmG2Op, direction::Int, r::Vector{Float64}, a::Float64)
+  if direction == op.direction1
+    return solve_splitting(op.mapX, r, a, 1.0)
+  elseif direction == op.direction2
+    return solve_splitting(op.mapY, r, a, 1.0)
+  else
+    return zeros(length(r))
+  end
+end
+
+apply_mixed(op::FdmG2Op, r::Vector{Float64}) = apply(op.corrMap, r)
+
+apply(op::FdmG2Op, r::Vector{Float64}) = apply(op.mapX, r) + apply(op.mapY, r) + apply_mixed(op, r)
+
+get_size(op::FdmG2Op) = 2
 
 type FdmSolverDesc{F <: FdmMesher, C <: FdmInnerValueCalculator, I <: Integer}
   mesher::F
@@ -706,12 +916,47 @@ end
 type HundsdorferScheme
   theta::Float64
   mu::Float64
-  map::FdmLinearOpLayout
+  map::FdmLinearOpComposite
   bcSet::FdmBoundaryConditionSet
   dt::Float64
 end
 
-HundsdorferScheme(theta::Float64, mu::Float64, map::FdmLinearOpLayout, bcSet::FdmBoundaryConditionSet) = HundsdorferScheme(theta, mu, map, bcSet, 0.0)
+HundsdorferScheme(theta::Float64, mu::Float64, map::FdmLinearOpComposite, bcSet::FdmBoundaryConditionSet) = HundsdorferScheme(theta, mu, map, bcSet, 0.0)
+
+set_step!(evolver::HundsdorferScheme, dt::Float64) = evolver.dt = dt
+
+function step!(evolver::HundsdorferScheme, a::Vector{Float64}, t::Float64)
+  t - evolver.dt > -1e-8 || error("a step towards negative time given")
+
+  set_time!(evolver.map, max(0.0, t - evolver.dt), t)
+  set_time!(evolver.bcSet, max(0.0, t - evolver.dt))
+
+  apply_before_applying!(evolver.bcSet, evolver.map)
+  y = a + evolver.dt * apply(evolver.map, a)
+  apply_after_applying!(evolver.bcSet, y)
+
+  y0 = copy(y)
+
+  for i = 1:get_size(evolver.map)
+    rhs = y - evolver.theta * evolver.dt * apply_direction(evolver.map, i, a)
+    y = solve_splitting(evolver.map, i, rhs, -evolver.theta * evolver.dt)
+  end
+
+  apply_before_applying!(evolver.bcSet, evolver.map)
+  yt = y0 + evolver.mu * evolver.dt * apply(evolver.map, y - a)
+  apply_after_applying!(evolver.bcSet, yt)
+
+  for i = 1:get_size(evolver.map)
+    rhs = yt - evolver.theta * evolver.dt * apply_direction(evolver.map, i, y)
+    yt = solve_splitting(evolver.map, i, rhs, -evolver.theta * evolver.dt)
+  end
+
+  apply_after_solving!(evolver.bcSet, yt)
+
+  a[:] = yt
+
+  return a, evolver
+end
 
 type FiniteDifferenceModel{T}
   evolver::T
@@ -719,6 +964,59 @@ type FiniteDifferenceModel{T}
 
   FiniteDifferenceModel{T}(evolver::T, stoppingTimes::Vector{Float64}) = new(evolver, sort(unique(stoppingTimes)))
 end
+
+function rollback_impl!(model::FiniteDifferenceModel, a::Vector{Float64}, from::Float64, to::Float64, steps::Int, condition::StepCondition)
+  dt = (from - to) / steps
+  t = from
+  set_step!(model.evolver, dt)
+
+  if length(model.stoppingTimes) > 0 && model.stoppingTimes[end] == from
+    apply_to!(condition, a, from)
+  end
+
+  for i = 1:steps
+    _now = t
+    _next = t - dt
+    hit = false
+    for j = length(model.stoppingTimes):-1:1
+      if _next <= model.stoppingTimes[j] && model.stoppingTimes[j] < _now
+        # a stopping time was hit
+        hit = true
+
+        # perform a small step to stoppingTimes[j]
+        set_step!(model.evolver, _now - model.stoppingTimes[j])
+        step!(model.evolver, a, _now)
+
+        apply_to!(condition, a, model.stoppingTimes[j])
+
+        # and continue the cycle
+        _now = model.stoppingTimes[j]
+      end
+    end
+
+    # if we did hit
+    if hit
+      # we might have to make a small step to complete the big one
+      if _now > _next
+        set_step!(model.evolver, _now - _next)
+        step!(model.evolver, a, _now)
+        apply_to!(condition, a, _next)
+      end
+
+      # and in any case, we have to reset the evolver to the default step
+      set_step!(model.evolver, dt)
+    else
+      # if we didn't, the evolver is already set to the default step, which is ok
+      step!(model.evolver, a, _now)
+      apply_to!(condition, a, _next)
+    end
+    t -= dt
+  end
+
+  return model, a
+end
+
+rollback!(model::FiniteDifferenceModel, a::Vector{Float64}, from::Float64, to::Float64, steps::Int, condition::StepCondition) = rollback_impl!(model, a, from, to, steps, condition)
 
 type FdmBackwardSolver
   map::FdmLinearOpComposite
@@ -742,8 +1040,13 @@ function rollback!(bsolv::FdmBackwardSolver, schemeType::Hundsdorfer, rhs::Vecto
   #   implicitEvolver = ImplicitEulerScheme(bsolv.map, bsolv.bcSet)
   # end
 
+  dampingSteps == 0 || error("damping steps shoudl be 0")
+
   hsEvolver = HundsdorferScheme(bsolv.schemeDesc.theta, bsolv.schemeDesc.mu, bsolv.map, bsolv.bcSet)
   hsModel = FiniteDifferenceModel{HundsdorferScheme}(hsEvolver, bsolv.condition.stoppingTimes)
+  rollback!(hsModel, rhs, dampingTo, to, steps, bsolv.condition)
+
+  return bsolv, rhs
 end
 
 type Fdm2DimSolver{FD <: FdmLinearOpComposite} <: LazyObject
@@ -797,14 +1100,18 @@ end
 
 function interpolate_at(solv::Fdm2DimSolver, x::Float64, y::Float64)
   calculate!(solv)
-  return get_interpolation(solv, x, y)
+  return 0.0
+  # return get_interpolation(solv, x, y)
 end
 
-function perform_calculations(solv::Fdm2DimSolver)
+function perform_calculations!(solv::Fdm2DimSolver)
   rhs = copy(solv.initialValues)
 
   bsolver = FdmBackwardSolver(solv.op, solv.solverDesc.bcSet, solv.conditions, solv.schemeDesc)
   rollback!(bsolver, solv.schemeDesc.schemeType, rhs, solv.solverDesc.maturity, 0.0, solv.solverDesc.timeSteps, solv.solverDesc.dampingSteps)
+
+  println(rhs[1])
+  println(rhs[end])
 end
 
 
@@ -822,6 +1129,6 @@ type FdmG2Solver <: LazyObject
   end
 end
 
-# function value_at(solv::FdmG2Solver, x::Float64, y::Float64)
-#   return interpolate_at(solv.solver, x, y)
-# end
+function value_at(solv::FdmG2Solver, x::Float64, y::Float64)
+  return interpolate_at(solv.solver, x, y)
+end

@@ -315,5 +315,5 @@ function _calculate!(pe::FdG2SwaptionEngine, swaption::Swaption)
   # 6. Solver
   solverDesc = FdmSolverDesc(mesher, boundaries, conditions, calculator, maturity, pe.tGrid, pe.dampingSteps)
   solver = FdmG2Solver(pe.model, solverDesc, pe.schemeDesc)
-  # results.value = value_at(solver, 0.0, 0.0)
+  swaption.results.value = value_at(solver, 0.0, 0.0)
 end

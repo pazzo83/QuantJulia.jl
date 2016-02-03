@@ -15,6 +15,7 @@ abstract StepCondition
 abstract FdmInnerValueCalculator
 abstract FdmLinearOpComposite
 abstract NinePointLinearOp
+abstract BoundaryCondition
 
 # Exercise
 abstract Exercise
