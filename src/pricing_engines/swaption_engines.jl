@@ -150,12 +150,14 @@ function _calculate!(pe::BlackSwaptionEngine, swaption::Swaption)
   strike = swap.fixedRate
 
   # override swap's pricing engine temporarily, bypassing normal calc flow, since swap.iborIndex might be using a diff curve
-  _calculate!(DiscountingSwapEngine(pe.yts), swap)
-  swap.lazyMixin.calculated = true
-  atmForward = fair_rate(swap)
+  tempSwap = clone(swap; pe=DiscountingSwapEngine(pe.yts))
+  # _calculate!(DiscountingSwapEngine(pe.yts), swap)
+  calculate!(tempSwap)
+  # swap.lazyMixin.calculated = true
+  atmForward = fair_rate(tempSwap)
 
-  if swap.spread != 0.0
-    correction = swap.spread * abs(floating_leg_BPS(swap) / fixed_leg_BPS(swap))
+  if tempSwap.spread != 0.0
+    correction = tempSwap.spread * abs(floating_leg_BPS(tempSwap) / fixed_leg_BPS(tempSwap))
     strike -= correction
     atmForward -= correction
     swaption.results.additionalResults["spreadCorrection"] = correction
@@ -166,18 +168,18 @@ function _calculate!(pe::BlackSwaptionEngine, swaption::Swaption)
   swaption.results.additionalResults["strike"] = strike
   swaption.results.additionalResults["atmForward"] = atmForward
 
-  annuity = get_annuity(swaption.delivery, swap)
+  annuity = get_annuity(swaption.delivery, tempSwap)
   swaption.results.additionalResults["annuity"] = annuity
 
   # the swap length calculation might be improved using the value date of the exercise date
-  swapLength = swap_length(pe.volStructure, exerciseDate, date(get_latest_coupon(swap.legs[1])))
+  swapLength = swap_length(pe.volStructure, exerciseDate, date(get_latest_coupon(tempSwap.legs[1])))
   swaption.results.additionalResults["swapLength"] = swapLength
 
   variance = black_varience(pe.volStructure, exerciseDate, swapLength, strike)
 
   stdDev = sqrt(variance)
   swaption.results.additionalResults["stdDev"] = stdDev
-  w = isa(swap.swapT, Payer) ? Call() : Put()
+  w = isa(tempSwap.swapT, Payer) ? Call() : Put()
 
   swaption.results.value = black_formula(w, strike, atmForward, stdDev, annuity, pe.displacement)
 
@@ -185,9 +187,9 @@ function _calculate!(pe::BlackSwaptionEngine, swaption::Swaption)
 
   swaption.results.additionalResults["vega"] = sqrt(exerciseTime) * black_formula_standard_dev_derivative(strike, atmForward, stdDev, annuity, pe.displacement)
 
-  # resetting swap
-  reset!(swap.results)
-  swap.lazyMixin.calculated = false
+  # # resetting swap
+  # reset!(swap.results)
+  # swap.lazyMixin.calculated = false
 
   return swaption
 end
