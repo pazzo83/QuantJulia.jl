@@ -145,7 +145,7 @@ export
     DiscretizedSwaption, DiscretizedSwap,
 
     # pricing_engines/swaption_engines.jl
-    G2SwaptionEngine, JamshidianSwaptionEngine, TreeSwaptionEngine, FdG2SwaptionEngine
+    G2SwaptionEngine, JamshidianSwaptionEngine, TreeSwaptionEngine, FdG2SwaptionEngine, FdHullWhiteSwaptionEngine
 
 # abstract types
 include("abstract_types.jl")

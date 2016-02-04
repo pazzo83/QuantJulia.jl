@@ -9,6 +9,7 @@ abstract StochasticProcess1D <: StochasticProcess
 abstract Lattice
 abstract TreeLattice <: Lattice
 abstract FdmSchemeDescType
+abstract FdScheme
 abstract FdmMesher
 abstract Fdm1DMesher
 abstract StepCondition

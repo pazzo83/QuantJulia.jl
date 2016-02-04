@@ -246,7 +246,7 @@ end
 
 function step_back!(lattice::TreeLattice, i::Int, vals::Vector{Float64}, newVals::Vector{Float64})
   # pragma omp parallel for
-  for j = 1:get_size(lattice.impl, i)
+  @simd for j = 1:get_size(lattice.impl, i)
     val = 0.0
     for l = 1:lattice.n
       @inbounds val += probability(lattice.impl, i, j, l) * vals[descendant(lattice.impl, i, j, l)]

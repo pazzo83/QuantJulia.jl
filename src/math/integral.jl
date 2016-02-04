@@ -24,7 +24,7 @@ function operator{I <: Integrator}(integrator::I, f::Function, a::Float64, b::Fl
   end
 end
 
-function integrate(integrator::SegmentIntegral, f::Function, a::Float64, b::Float64)
+function Math.integrate(integrator::SegmentIntegral, f::Function, a::Float64, b::Float64)
   dx = (b - a) / integrator.intervals
   sum_ = 0.5 * (f(a) + f(b))
   end_ = b - 0.5 * dx

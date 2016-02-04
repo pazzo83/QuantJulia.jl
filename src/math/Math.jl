@@ -1,6 +1,8 @@
 # Math module
 module Math
 
+using Dierckx
+
 # types for derivatives, etc
 abstract FunctionType
 
@@ -115,7 +117,7 @@ export Integrator, SegmentIntegral, operator, integrate
 include("integral.jl")
 
 # interpolation.jl
-export Interpolation, LogInterpolation, update!, locate, initialize!, value
+export Interpolation, LogInterpolation, BicubicSpline, NaturalCubicSpline, update!, locate, initialize!, value
 
 include("interpolation.jl")
 

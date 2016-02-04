@@ -30,6 +30,13 @@ type HullWhiteFittingParameter{T <: TermStructure} <: Parameter
   ts::T
 end
 
+function value(param::HullWhiteFittingParameter, t::Float64)
+  forward = forward_rate(param.ts, t, t, ContinuousCompounding(), NoFrequency()).rate
+  temp = param.a < sqrt(eps()) ? param.sigma * t : param.sigma * (1.0 - exp(-param.a * t)) / param.a
+
+  return forward + 0.5 * temp * temp
+end
+
 type TermStructureFittingParameter{T <: TermStructure} <: Parameter
   times::Vector{Float64}
   values::Vector{Float64}

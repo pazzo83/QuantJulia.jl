@@ -49,8 +49,8 @@ end
 generate_arguments!(m::BlackKarasinski) = m # do nothing
 
 
-type HullWhite{TermStructureConsistentModelType, T <: TermStructure} <: OneFactorModel{TermStructureConsistentModelType}
-  modT::TermStructureConsistentModelType
+type HullWhite{AffineModelType, T <: TermStructure} <: OneFactorModel{AffineModelType}
+  modT::AffineModelType
   r0::Float64
   a::ConstantParameter
   sigma::ConstantParameter
@@ -70,7 +70,7 @@ function HullWhite{T <: TermStructure}(ts::T, a::Float64 = 0.1, sigma::Float64 =
 
   phi  = HullWhiteFittingParameter(a, sigma, ts)
 
-  return HullWhite(TermStructureConsistentModelType(), r0, a_const, sigma_const, phi, ts, privateConstraint, ShortRateModelCommon())
+  return HullWhite(AffineModelType(), r0, a_const, sigma_const, phi, ts, privateConstraint, ShortRateModelCommon())
 end
 
 ## Dynamics ##
@@ -87,6 +87,8 @@ HullWhiteDynamics{P <: Parameter}(fitting::P, a::Float64, sigma::Float64) = Hull
 short_rate(dynamic::HullWhiteDynamics, t::Float64, x::Float64) = x + dynamic.fitting(t)
 
 generate_arguments!(m::HullWhite) = m.phi = HullWhiteFittingParameter(get_a(m), get_sigma(m), m.ts)
+
+get_dynamics(m::HullWhite) = HullWhiteDynamics(m.phi, get_a(m), get_sigma(m))
 
 type BlackKarasinskiDynamics{P <: Parameter} <: ShortRateDynamics
   process::OrnsteinUhlenbeckProcess
@@ -243,7 +245,8 @@ end
 #   phi::HullWhiteFittingParameter
 # end
 
-discount_bond{M <: ShortRateModel}(model::M, tNow::Float64, maturity::Float64, _rate::Float64) = A(model, tNow, maturity) * exp(-B(model, tNow, maturity) * _rate)
+discount_bond(model::OneFactorModel, tNow::Float64, maturity::Float64, factors::Vector{Float64}) = discount_bond(model, tNow, maturity, factors[1])
+discount_bond{M <: OneFactorModel}(model::M, tNow::Float64, maturity::Float64, _rate::Float64) = A(model, tNow, maturity) * exp(-B(model, tNow, maturity) * _rate)
 
 function discount_bond_option{O <: OptionType}(model::HullWhite, optionType::O, strike::Float64, maturity::Float64, bondStart::Float64, bondMaturity::Float64)
   _a = get_a(model)

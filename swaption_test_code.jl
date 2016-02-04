@@ -66,6 +66,8 @@ function main()
   fixedITMRate = fixedATMRate * 0.8
 
   atmSwap = VanillaSwap(swapType, 1000.0, fixedSchedule, fixedATMRate, fixedLegDayCounter, indexSixMonths, 0.0, floatSchedule, indexSixMonths.dc, DiscountingSwapEngine(rhTermStructure))
+  otmSwap = VanillaSwap(swapType, 1000.0, fixedSchedule, fixedOTMRate, fixedLegDayCounter, indexSixMonths, 0.0, floatSchedule, indexSixMonths.dc, DiscountingSwapEngine(rhTermStructure))
+  itmSwap = VanillaSwap(swapType, 1000.0, fixedSchedule, fixedITMRate, fixedLegDayCounter, indexSixMonths, 0.0, floatSchedule, indexSixMonths.dc, DiscountingSwapEngine(rhTermStructure))
 
   times = zeros(0)
   swaptions = Vector{SwaptionHelper}(numRows)
@@ -153,5 +155,93 @@ function main()
 
   update_pricing_engine!(bermudanSwaption, FdG2SwaptionEngine(modelG2))
 
-  npv(bermudanSwaption)
+  println(@sprintf("G2 (fdm):       %.6f", npv(bermudanSwaption)))
+
+  update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(hullWhiteModel, 50))
+
+  println(@sprintf("HW (tree):       %.6f", npv(bermudanSwaption)))
+
+  update_pricing_engine!(bermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel))
+
+  println(@sprintf("HW (fdm):       %.6f", npv(bermudanSwaption)))
+
+  update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(hullWhiteModel2, 50))
+
+  println(@sprintf("HW (num, tree):       %.6f", npv(bermudanSwaption)))
+
+  update_pricing_engine!(bermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel2))
+
+  println(@sprintf("HW (num, fdm):       %.6f", npv(bermudanSwaption)))
+
+  update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(blackKarasinski, 50))
+
+  println(@sprintf("BK:       %.6f", npv(bermudanSwaption)))
+
+  # OTM Bermudan swaption pricing
+  println("")
+  println(@sprintf("Payer bermudan swaption struck at %.6f %% (OTM)", fixedOTMRate * 100.0))
+
+  otmBermudanSwaption = Swaption(otmSwap, bermudanExercise)
+
+  update_pricing_engine!(otmBermudanSwaption, TreeSwaptionEngine(modelG2, 300))
+
+  println(@sprintf("G2 (tree):       %.6f", npv(otmBermudanSwaption)))
+
+  update_pricing_engine!(otmBermudanSwaption, FdG2SwaptionEngine(modelG2))
+
+  println(@sprintf("G2 (fdm):       %.6f", npv(otmBermudanSwaption)))
+
+  update_pricing_engine!(otmBermudanSwaption, TreeSwaptionEngine(hullWhiteModel, 50))
+
+  println(@sprintf("HW (tree):       %.6f", npv(otmBermudanSwaption)))
+
+  update_pricing_engine!(otmBermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel))
+
+  println(@sprintf("HW (fdm):       %.6f", npv(otmBermudanSwaption)))
+
+  update_pricing_engine!(otmBermudanSwaption, TreeSwaptionEngine(hullWhiteModel2, 50))
+
+  println(@sprintf("HW (num, tree):       %.6f", npv(otmBermudanSwaption)))
+
+  update_pricing_engine!(otmBermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel2))
+
+  println(@sprintf("HW (num, fdm):       %.6f", npv(otmBermudanSwaption)))
+
+  update_pricing_engine!(otmBermudanSwaption, TreeSwaptionEngine(blackKarasinski, 50))
+
+  println(@sprintf("BK:       %.6f", npv(otmBermudanSwaption)))
+
+  # ITM Bermudan swaption pricing
+  println("")
+  println(@sprintf("Payer bermudan swaption struck at %.6f %% (OTM)", fixedITMRate * 100.0))
+
+  itmBermudanSwaption = Swaption(itmSwap, bermudanExercise)
+
+  update_pricing_engine!(itmBermudanSwaption, TreeSwaptionEngine(modelG2, 50))
+
+  println(@sprintf("G2 (tree):       %.6f", npv(itmBermudanSwaption)))
+
+  update_pricing_engine!(itmBermudanSwaption, FdG2SwaptionEngine(modelG2))
+
+  println(@sprintf("G2 (fdm):       %.6f", npv(itmBermudanSwaption)))
+
+  update_pricing_engine!(itmBermudanSwaption, TreeSwaptionEngine(hullWhiteModel, 50))
+
+  println(@sprintf("HW (tree):       %.6f", npv(itmBermudanSwaption)))
+
+  update_pricing_engine!(itmBermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel))
+
+  println(@sprintf("HW (fdm):       %.6f", npv(itmBermudanSwaption)))
+
+  update_pricing_engine!(itmBermudanSwaption, TreeSwaptionEngine(hullWhiteModel2, 50))
+
+  println(@sprintf("HW (num, tree):       %.6f", npv(itmBermudanSwaption)))
+
+  update_pricing_engine!(itmBermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel2))
+
+  println(@sprintf("HW (num, fdm):       %.6f", npv(itmBermudanSwaption)))
+
+  update_pricing_engine!(itmBermudanSwaption, TreeSwaptionEngine(blackKarasinski, 50))
+
+  println(@sprintf("BK:       %.6f", npv(itmBermudanSwaption)))
 end

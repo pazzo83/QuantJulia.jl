@@ -1,3 +1,4 @@
+using QuantJulia.Math
 using StatsFuns
 
 type FdmLinearOpLayout{I <: Integer}
@@ -247,6 +248,14 @@ type FdmMesherComposite{FM1D <: Fdm1DMesher} <: FdmMesher
   meshers::Vector{FM1D} # this could change
 end
 
+# Constructors
+function FdmMesherComposite{F1D <: Fdm1DMesher}(mesh::F1D)
+  meshers = F1D[mesh]
+  layout = get_layout_from_meshers(meshers)
+
+  return FdmMesherComposite(layout, meshers)
+end
+
 function FdmMesherComposite{F1D <: Fdm1DMesher}(xmesher::F1D, ymesher::F1D)
   meshers = F1D[xmesher, ymesher]
   layout = get_layout_from_meshers(meshers)
@@ -332,6 +341,8 @@ function get_state{I <: Integer}(::G2, calc::FdmAffineModelSwapInnerValue, coord
   return retVal
 end
 
+get_state{I <: Integer}(model::HullWhite, calc::FdmAffineModelSwapInnerValue, coords::Vector{I}, t::Float64) = [short_rate(get_dynamics(model), t, get_location(calc.mesher, coords, calc.direction))]
+
 function inner_value{I <: Integer}(calc::FdmAffineModelSwapInnerValue, coords::Vector{I}, i::I, t::Float64)
   iterExerciseDate = get(calc.exerciseDates, t, Date())
   disRate = get_state(calc.disModel, calc, coords, t)
@@ -371,6 +382,7 @@ end
 avg_inner_value{I <: Integer}(calc::FdmAffineModelSwapInnerValue, coords::Vector{I}, i::I, t::Float64) = inner_value(calc, coords, i, t)
 
 type Hundsdorfer <: FdmSchemeDescType end
+type Douglas <: FdmSchemeDescType end
 
 type FdmSchemeDesc{F <: FdmSchemeDescType}
   schemeType::F
@@ -379,6 +391,7 @@ type FdmSchemeDesc{F <: FdmSchemeDescType}
 end
 
 FdmSchemeDesc(t::Hundsdorfer) = FdmSchemeDesc(t, 0.5 + sqrt(3.0) / 6.0, 0.5)
+FdmSchemeDesc(t::Douglas) = FdmSchemeDesc(t, 0.5, 0.0)
 
 ## Meshers ##
 type FdmSimpleProcess1dMesher{I <: Integer, P <: StochasticProcess1D} <: Fdm1DMesher
@@ -865,6 +878,26 @@ function FdmG2Op(mesher::FdmMesher, model::G2, direction1::Int, direction2::Int)
   return FdmG2Op(direction1, direction2, x, y, dxMap, dyMap, corrMap, mapX, mapY, model)
 end
 
+type FdmHullWhiteOp{I <: Integer} <: FdmLinearOpComposite
+  direction::I
+  x::Vector{Float64}
+  dzMap::TripleBandLinearOp
+  mapT::TripleBandLinearOp
+  model::HullWhite
+end
+
+function FdmHullWhiteOp(mesher::FdmMesher, model::HullWhite, direction::Int)
+  x = get_locations(mesher, direction)
+
+  dzMap = add!(mult!(FirstDerivativeOp(direction, mesher), (-x * get_a(model))),
+              mult!(SecondDerivativeOp(direction, mesher), (0.5 * get_sigma(model) * get_sigma(model)) * ones(mesher.layout.size)))
+
+  mapT = TripleBandLinearOp(direction, mesher)
+
+  return FdmHullWhiteOp(direction, x, dzMap, mapT, model)
+end
+
+# OP methods #
 function set_time!(op::FdmG2Op, t1::Float64, t2::Float64)
   dynamics = get_dynamics(op.model)
 
@@ -877,11 +910,29 @@ function set_time!(op::FdmG2Op, t1::Float64, t2::Float64)
   return op
 end
 
+function set_time!(op::FdmHullWhiteOp, t1::Float64, t2::Float64)
+  dynamics = get_dynamics(op.model)
+
+  phi = 0.5 * (short_rate(dynamics, t1, 0.0) + short_rate(dynamics, t2, 0.0))
+
+  axpyb!(op.mapT, Vector{Float64}(0), op.dzMap, op.dzMap, -(op.x + phi))
+
+  return op
+end
+
 function apply_direction(op::FdmG2Op, direction::Int, r::Vector{Float64})
   if direction == op.direction1
     return apply(op.mapX, r)
   elseif direction == op.direction2
     return apply(op.mapY, r)
+  else
+    return zeros(length(r))
+  end
+end
+
+function apply_direction(op::FdmHullWhiteOp, direction::Int, r::Vector{Float64})
+  if direction == op.direction
+    return apply(op.mapT, r)
   else
     return zeros(length(r))
   end
@@ -897,11 +948,22 @@ function solve_splitting(op::FdmG2Op, direction::Int, r::Vector{Float64}, a::Flo
   end
 end
 
+function solve_splitting(op::FdmHullWhiteOp, direction::Int, r::Vector{Float64}, a::Float64)
+  if direction == op.direction
+    return solve_splitting(op.mapT, r, a, 1.0)
+  else
+    return zeros(length(r))
+  end
+end
+
 apply_mixed(op::FdmG2Op, r::Vector{Float64}) = apply(op.corrMap, r)
+apply_mixed(op::FdmHullWhiteOp, r::Vector{Float64}) = zeros(length(r))
 
 apply(op::FdmG2Op, r::Vector{Float64}) = apply(op.mapX, r) + apply(op.mapY, r) + apply_mixed(op, r)
+apply(op::FdmHullWhiteOp, r::Vector{Float64}) = apply(op.mapT, r)
 
 get_size(op::FdmG2Op) = 2
+get_size(op::FdmHullWhiteOp) = 1
 
 type FdmSolverDesc{F <: FdmMesher, C <: FdmInnerValueCalculator, I <: Integer}
   mesher::F
@@ -913,7 +975,8 @@ type FdmSolverDesc{F <: FdmMesher, C <: FdmInnerValueCalculator, I <: Integer}
   dampingSteps::I
 end
 
-type HundsdorferScheme
+## Schemes ##
+type HundsdorferScheme <: FdScheme
   theta::Float64
   mu::Float64
   map::FdmLinearOpComposite
@@ -923,7 +986,16 @@ end
 
 HundsdorferScheme(theta::Float64, mu::Float64, map::FdmLinearOpComposite, bcSet::FdmBoundaryConditionSet) = HundsdorferScheme(theta, mu, map, bcSet, 0.0)
 
-set_step!(evolver::HundsdorferScheme, dt::Float64) = evolver.dt = dt
+type DouglasScheme <: FdScheme
+  theta::Float64
+  map::FdmLinearOpComposite
+  bcSet::FdmBoundaryConditionSet
+  dt::Float64
+end
+
+DouglasScheme(theta::Float64, map::FdmLinearOpComposite, bcSet::FdmBoundaryConditionSet) = DouglasScheme(theta, map, bcSet, 0.0)
+
+set_step!(evolver::FdScheme, dt::Float64) = evolver.dt = dt
 
 function step!(evolver::HundsdorferScheme, a::Vector{Float64}, t::Float64)
   t - evolver.dt > -1e-8 || error("a step towards negative time given")
@@ -958,6 +1030,29 @@ function step!(evolver::HundsdorferScheme, a::Vector{Float64}, t::Float64)
   return a, evolver
 end
 
+function step!(evolver::DouglasScheme, a::Vector{Float64}, t::Float64)
+  t - evolver.dt > -1e-8 || error("a step towards negative time given")
+
+  set_time!(evolver.map, max(0.0, t - evolver.dt), t)
+  set_time!(evolver.bcSet, max(0.0, t - evolver.dt))
+
+  apply_before_applying!(evolver.bcSet, evolver.map)
+  y = a + evolver.dt * apply(evolver.map, a)
+  apply_after_applying!(evolver.bcSet, y)
+
+  for i = 1:get_size(evolver.map)
+    rhs = y - evolver.theta * evolver.dt * apply_direction(evolver.map, i, a)
+    y = solve_splitting(evolver.map, i, rhs, -evolver.theta * evolver.dt)
+  end
+
+  apply_after_solving!(evolver.bcSet, y)
+
+  a[:] = y
+
+  return a, evolver
+end
+
+## Main Finite Difference Model ##
 type FiniteDifferenceModel{T}
   evolver::T
   stoppingTimes::Vector{Float64}
@@ -1018,6 +1113,7 @@ end
 
 rollback!(model::FiniteDifferenceModel, a::Vector{Float64}, from::Float64, to::Float64, steps::Int, condition::StepCondition) = rollback_impl!(model, a, from, to, steps, condition)
 
+## Solvers ##
 type FdmBackwardSolver
   map::FdmLinearOpComposite
   bcSet::FdmBoundaryConditionSet
@@ -1049,6 +1145,55 @@ function rollback!(bsolv::FdmBackwardSolver, schemeType::Hundsdorfer, rhs::Vecto
   return bsolv, rhs
 end
 
+function rollback!(bsolv::FdmBackwardSolver, schemeType::Douglas, rhs::Vector{Float64}, from::Float64, to::Float64, steps::Int, dampingSteps::Int)
+  deltaT = from - to
+  allSteps = steps + dampingSteps
+  dampingTo = from - (deltaT * dampingSteps) / allSteps
+
+  dampingSteps == 0 || error("damping steps shoudl be 0")
+
+  dsEvolver = DouglasScheme(bsolv.schemeDesc.theta, bsolv.map, bsolv.bcSet)
+  dsModel = FiniteDifferenceModel{DouglasScheme}(dsEvolver, bsolv.condition.stoppingTimes)
+  rollback!(dsModel, rhs, dampingTo, to, steps, bsolv.condition)
+
+  return bsolv, rhs
+end
+
+type Fdm1DimSolver{FD <: FdmLinearOpComposite} <: LazyObject
+  lazyMixin::LazyMixin
+  solverDesc::FdmSolverDesc
+  schemeDesc::FdmSchemeDesc
+  op::FD
+  thetaCondition::FdmSnapshotCondition
+  conditions::FdmStepConditionComposite
+  initialValues::Vector{Float64}
+  resultValues::Vector{Float64}
+  x::Vector{Float64}
+  interpolation::NaturalCubicSpline
+
+  function Fdm1DimSolver{FD}(solverDesc::FdmSolverDesc, schemeDesc::FdmSchemeDesc, op::FD)
+    thetaCondition = FdmSnapshotCondition(0.99 * min(1.0 / 365.0, length(solverDesc.condition.stoppingTimes) == 0 ? solverDesc.maturity : solverDesc.condition.stoppingTimes[1]))
+    conditions = join_conditions_FdmStepConditionComposite(thetaCondition, solverDesc.condition)
+
+    layout = solverDesc.mesher.layout
+
+    x = zeros(layout.size)
+    initialValues = zeros(layout.size)
+    resultValues = zeros(layout.size)
+
+    coords = ones(Int, length(layout.dim))
+
+    for i = 1:layout.size
+      initialValues[i] = avg_inner_value(solverDesc.calculator, coords, i, solverDesc.maturity)
+      x[i] = get_location(solverDesc.mesher, coords, 1)
+
+      iter_coords!(coords, layout.dim)
+    end
+
+    new(LazyMixin(), solverDesc, schemeDesc, op, thetaCondition, conditions, initialValues, resultValues, x)
+  end
+end
+
 type Fdm2DimSolver{FD <: FdmLinearOpComposite} <: LazyObject
   lazyMixin::LazyMixin
   solverDesc::FdmSolverDesc
@@ -1060,7 +1205,7 @@ type Fdm2DimSolver{FD <: FdmLinearOpComposite} <: LazyObject
   resultValues::Matrix{Float64}
   x::Vector{Float64}
   y::Vector{Float64}
-  # interpolation::BicubicSpline
+  interpolation::BicubicSpline
 
   function Fdm2DimSolver{FD}(solverDesc::FdmSolverDesc, schemeDesc::FdmSchemeDesc, op::FD)
     thetaCondition = FdmSnapshotCondition(0.99 * min(1.0 / 365.0, length(solverDesc.condition.stoppingTimes) == 0 ? solverDesc.maturity : solverDesc.condition.stoppingTimes[1]))
@@ -1098,10 +1243,28 @@ type Fdm2DimSolver{FD <: FdmLinearOpComposite} <: LazyObject
   end
 end
 
+get_interpolation(solv::Fdm1DimSolver, x::Float64) = solv.interpolation(x)
+get_interpolation(solv::Fdm2DimSolver, x::Float64, y::Float64) = solv.interpolation.spline(x, y)
+
+function interpolate_at(solv::Fdm1DimSolver, x::Float64)
+  calculate!(solv)
+  return get_interpolation(solv, x)
+end
+
 function interpolate_at(solv::Fdm2DimSolver, x::Float64, y::Float64)
   calculate!(solv)
-  return 0.0
-  # return get_interpolation(solv, x, y)
+  return get_interpolation(solv, x, y)
+end
+
+function perform_calculations!(solv::Fdm1DimSolver)
+  rhs = copy(solv.initialValues)
+
+  bsolver = FdmBackwardSolver(solv.op, solv.solverDesc.bcSet, solv.conditions, solv.schemeDesc)
+  rollback!(bsolver, solv.schemeDesc.schemeType, rhs, solv.solverDesc.maturity, 0.0, solv.solverDesc.timeSteps, solv.solverDesc.dampingSteps)
+  solv.resultValues = copy(rhs)
+  solv.interpolation = NaturalCubicSpline(solv.x, solv.resultValues)
+
+  return solv
 end
 
 function perform_calculations!(solv::Fdm2DimSolver)
@@ -1109,11 +1272,11 @@ function perform_calculations!(solv::Fdm2DimSolver)
 
   bsolver = FdmBackwardSolver(solv.op, solv.solverDesc.bcSet, solv.conditions, solv.schemeDesc)
   rollback!(bsolver, solv.schemeDesc.schemeType, rhs, solv.solverDesc.maturity, 0.0, solv.solverDesc.timeSteps, solv.solverDesc.dampingSteps)
+  solv.resultValues = reshape(rhs, length(solv.x), length(solv.y))
+  solv.interpolation = BicubicSpline(solv.x, solv.y, solv.resultValues)
 
-  println(rhs[1])
-  println(rhs[end])
+  return solv
 end
-
 
 type FdmG2Solver <: LazyObject
   lazyMixin::LazyMixin
@@ -1129,6 +1292,24 @@ type FdmG2Solver <: LazyObject
   end
 end
 
+type FdmHullWhiteSolver <: LazyObject
+  lazyMixin::LazyMixin
+  model::HullWhite
+  solverDesc::FdmSolverDesc
+  schemeDesc::FdmSchemeDesc
+  solver::Fdm1DimSolver
+
+  function FdmHullWhiteSolver(model::HullWhite, solverDesc::FdmSolverDesc, schemeDesc::FdmSchemeDesc)
+    op = FdmHullWhiteOp(solverDesc.mesher, model, 1)
+    solver = Fdm1DimSolver{FdmHullWhiteOp}(solverDesc, schemeDesc, op)
+    new(LazyMixin(), model, solverDesc, schemeDesc, solver)
+  end
+end
+
 function value_at(solv::FdmG2Solver, x::Float64, y::Float64)
   return interpolate_at(solv.solver, x, y)
+end
+
+function value_at(solv::FdmHullWhiteSolver, x::Float64)
+  return interpolate_at(solv.solver, x)
 end
