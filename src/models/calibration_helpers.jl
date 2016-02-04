@@ -1,5 +1,3 @@
-using QuantJulia.Time
-
 type RelativePriceError <: CalibrationErrorType end
 type PriceError <: CalibrationErrorType end
 type ImpliedVolError <: CalibrationErrorType end

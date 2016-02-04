@@ -1,5 +1,3 @@
-using QuantJulia.Math
-
 ## ONE FACTOR MODELS ##
 type OneFactorShortRateTree{S <: ShortRateDynamics} <: ShortRateTree
   tree::TrinomialTree

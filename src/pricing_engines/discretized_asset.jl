@@ -1,5 +1,4 @@
 ## Discretized Asset types ond methods ##
-using QuantJulia.Time, QuantJulia.Math
 
 type DiscretizedAssetCommon{L <: Lattice}
   time::Float64

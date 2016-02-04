@@ -28,6 +28,7 @@ include("time/Time.jl")
 include("math/Math.jl")
 
 # MAIN MODULE CODE
+using QuantJulia.Math, QuantJulia.Time
 
 # Constants #
 const basisPoint = 0.0001
@@ -136,7 +137,7 @@ export
     BlackKarasinski, HullWhite,
 
     # methods - finite difference
-    FdmG2Solver,
+    FdmG2Solver,FdmHullWhiteSolver,
 
     # pricing_engines/pricing_engines.jl
     DiscountingBondEngine, DiscountingSwapEngine,
@@ -214,7 +215,14 @@ include("models/short_rate/two_factor.jl")
 include("models/short_rate/one_factor.jl")
 
 # Finite Difference method
-include("methods/finite_differences.jl")
+include("methods/finite_differences/fd_layout.jl")
+include("methods/finite_differences/fd_step_condition.jl")
+include("methods/finite_differences/fd_mesher.jl")
+include("methods/finite_differences/fd_calc.jl")
+include("methods/finite_differences/fd_operator.jl")
+include("methods/finite_differences/fd_scheme.jl")
+include("methods/finite_differences/fd_model.jl")
+include("methods/finite_differences/fd_solvers.jl")
 
 # Pricing Engines ------------------------
 include("pricing_engines/pricing_engines.jl")

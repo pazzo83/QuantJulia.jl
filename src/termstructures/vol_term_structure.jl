@@ -1,5 +1,3 @@
-using QuantJulia.Time
-
 type NullOptionVolatilityStructure <: OptionletVolatilityStructure end
 
 type ConstantOptionVolatility{I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount} <: OptionletVolatilityStructure

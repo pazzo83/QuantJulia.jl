@@ -1,5 +1,4 @@
 # Solvers
-
 abstract Solver1D
 
 type SolverInfo{I <: Integer}

@@ -1,7 +1,5 @@
 # Curves
 
-using QuantJulia.Math, QuantJulia.Time
-
 type NullCurve <: Curve end
 
 type PiecewiseYieldCurve{I <: Integer, B <: BootstrapHelper, DC <: DayCount, P <: Interpolation, T <: BootstrapTrait} <: InterpolatedCurve{B, DC, P, T}

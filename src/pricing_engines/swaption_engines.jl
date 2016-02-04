@@ -1,6 +1,5 @@
 ## Swaption Pricing Engines ##
 using Distributions
-using QuantJulia.Time, QuantJulia.Math
 
 type BlackSwaptionEngine{Y <: YieldTermStructure, S <: SwaptionVolatilityStructure, DC <: DayCount} <: PricingEngine{Y}
   yts::Y

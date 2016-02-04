@@ -1,5 +1,3 @@
-using QuantJulia.Time
-
 type IborIndex{S <: AbstractString, I <: Integer, B <: BusinessCalendar, C <: BusinessDayConvention, DC <: DayCount, T <: TermStructure} <: InterestRateIndex
   familyName::S
   tenor::TenorPeriod

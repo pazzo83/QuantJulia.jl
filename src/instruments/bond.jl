@@ -1,5 +1,3 @@
-using QuantJulia.Time
-
 type DividendSchedule
   dividends::Vector{Dividend}
 end

@@ -1,5 +1,4 @@
 # main term structures
-using QuantJulia.Time
 
 type NullYieldTermStructure <: YieldTermStructure end
 

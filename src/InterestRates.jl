@@ -1,7 +1,4 @@
 # Interest Rates
-# module InterestRates
-
-using QuantJulia.Time
 
 # Compounding Types
 abstract CompoundingType

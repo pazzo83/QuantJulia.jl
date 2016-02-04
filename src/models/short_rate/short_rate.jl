@@ -1,5 +1,3 @@
-using QuantJulia.Math
-
 ## ShortRateTree methods ##
 get_state_prices!(tree::ShortRateTree, i::Int) = get_state_prices!(tree.treeLattice, i)
 

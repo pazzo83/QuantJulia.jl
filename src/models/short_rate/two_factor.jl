@@ -1,4 +1,3 @@
-using QuantJulia.Math
 using Distributions
 
 type TwoFactorShortRateTree{S <: ShortRateDynamics} <: ShortRateTree

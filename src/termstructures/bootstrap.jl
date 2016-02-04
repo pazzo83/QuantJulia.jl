@@ -1,5 +1,3 @@
-using QuantJulia.Math
-
 # bootstrapping traits
 const avg_rate = 0.05
 const max_rate = 1.0

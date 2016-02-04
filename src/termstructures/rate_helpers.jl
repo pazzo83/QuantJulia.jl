@@ -1,5 +1,3 @@
-using QuantJulia.Time
-
 type SwapRateHelper{PrT <: Dates.Period, PrS <: Dates.Period} <: RateHelper
   rate::Quote
   tenor::PrT

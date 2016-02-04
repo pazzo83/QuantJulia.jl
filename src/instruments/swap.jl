@@ -1,5 +1,3 @@
-using QuantJulia.Time
-
 type Payer <: SwapType end
 type Receiver <: SwapType end
 
