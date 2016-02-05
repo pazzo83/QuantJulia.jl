@@ -1,7 +1,7 @@
 # Pricing Engines module
 # module PricingEngines
 
-type DiscountingBondEngine{Y <: YieldTermStructure} <: PricingEngine{Y}
+type DiscountingBondEngine{Y <: YieldTermStructure} <: PricingEngine
   yts::Y
 
   function call(::Type{DiscountingBondEngine})
@@ -13,7 +13,7 @@ type DiscountingBondEngine{Y <: YieldTermStructure} <: PricingEngine{Y}
   end
 end
 
-type DiscountingSwapEngine{Y <: YieldTermStructure} <: PricingEngine{Y}
+type DiscountingSwapEngine{Y <: YieldTermStructure} <: PricingEngine
   yts::Y
 
   function call(::Type{DiscountingSwapEngine})

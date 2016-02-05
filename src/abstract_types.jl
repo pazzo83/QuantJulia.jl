@@ -49,10 +49,10 @@ abstract BondHelper <: BootstrapHelper
 abstract RateHelper <: BootstrapHelper
 
 # Pricing Engines
-abstract PricingEngine{Y}
+abstract PricingEngine
 abstract DiscretizedAsset
 abstract DiscretizedOption <: DiscretizedAsset
-abstract LatticeShortRateModelEngine{S, Y} <: PricingEngine{Y}
+abstract LatticeShortRateModelEngine{S, Y} <: PricingEngine
 
 # Cash Flows
 abstract CashFlows

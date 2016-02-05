@@ -1,7 +1,11 @@
 ## Swaption Pricing Engines ##
 using Distributions
 
-type BlackSwaptionEngine{Y <: YieldTermStructure, S <: SwaptionVolatilityStructure, DC <: DayCount} <: PricingEngine{Y}
+type NullSwaptionEngine <: PricingEngine end
+
+_calculate!(::NullSwaptionEngine, ::Swaption) = error("Must set valid pricing engine, use update_pricing_engine")
+
+type BlackSwaptionEngine{Y <: YieldTermStructure, S <: SwaptionVolatilityStructure, DC <: DayCount} <: PricingEngine
   yts::Y
   vol::Quote
   volStructure::S
@@ -12,7 +16,7 @@ end
 BlackSwaptionEngine{Y <: YieldTermStructure, DC <: DayCount}(yts::Y, vol::Quote, dc::DC, displacement::Float64 = 0.0) =
                     BlackSwaptionEngine(yts, vol, ConstantSwaptionVolatility(0, QuantJulia.Time.NullCalendar(), QuantJulia.Time.Following(), vol, dc), dc, displacement)
 
-type G2SwaptionEngine{AffineModelType, Y <: YieldTermStructure, I <: Integer} <: PricingEngine{Y}
+type G2SwaptionEngine{AffineModelType, Y <: YieldTermStructure, I <: Integer} <: PricingEngine
   model::G2{AffineModelType, Y}
   range::Float64
   intervals::I
@@ -20,7 +24,7 @@ type G2SwaptionEngine{AffineModelType, Y <: YieldTermStructure, I <: Integer} <:
   call{Y, I}(::Type{G2SwaptionEngine}, model::G2{AffineModelType, Y}, range::Float64, intervals::I) = new{AffineModelType, Y, I}(model, range, intervals)
 end
 
-type JamshidianSwaptionEngine{S <: ShortRateModel, Y <: YieldTermStructure} <: PricingEngine{Y}
+type JamshidianSwaptionEngine{S <: ShortRateModel, Y <: YieldTermStructure} <: PricingEngine
   model::S
   ts::Y
 
@@ -66,7 +70,7 @@ function TreeSwaptionEngine{S <: ShortRateModel}(model::S, tg::TimeGrid)
   return ts
 end
 
-type FdG2SwaptionEngine{I <: Integer, Y <: TermStructure} <: PricingEngine{Y}
+type FdG2SwaptionEngine{I <: Integer, Y <: TermStructure} <: PricingEngine
   model::G2
   tGrid::I
   xGrid::I
@@ -81,7 +85,7 @@ FdG2SwaptionEngine(model::G2, tGrid::Int = 100, xGrid::Int = 50, yGrid::Int = 50
                   schemeDesc::FdmSchemeDesc = FdmSchemeDesc(Hundsdorfer())) =
                   FdG2SwaptionEngine(model, tGrid, xGrid, yGrid, dampingSteps, invEps, schemeDesc, model.ts)
 
-type FdHullWhiteSwaptionEngine{I <: Integer, Y <: TermStructure} <: PricingEngine{Y}
+type FdHullWhiteSwaptionEngine{I <: Integer, Y <: TermStructure} <: PricingEngine
   model::HullWhite
   tGrid::I
   xGrid::I

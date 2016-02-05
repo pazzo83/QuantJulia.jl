@@ -135,11 +135,14 @@ function fair_rate(swap::VanillaSwap)
   return swap.results.fairRate
 end
 
+# some helper methods #
 function clone(swap::VanillaSwap; pe::PricingEngine = swap.pricingEngine)
-  lazyMixin = pe == swap.pricingEngine ? swap.lazyMixin : LazyMixin()
-  args = VanillaSwapArgs(swap.legs)
-  res = SwapResults(2)
+  lazyMixin, res, args = pe == swap.pricingEngine ? (swap.lazyMixin, swap.results, swap.args) : (LazyMixin(), SwapResults(2), VanillaSwapArgs(swap.legs))
+  # args = VanillaSwapArgs(swap.legs)
+  # res = SwapResults(2)
 
   return VanillaSwap(lazyMixin, swap.swapT, swap.nominal, swap.fixedSchedule, swap.fixedRate, swap.fixedDayCount, swap.iborIndex, swap.spread,
                     swap.floatSchedule, swap.floatDayCount, swap.paymentConvention, swap.legs, swap.payer, pe, res, args)
 end
+
+get_pricing_engine_type{ST, DC_fix, DC_float, B, L, P}(::VanillaSwap{ST, DC_fix, DC_float, B, L, P}) = P

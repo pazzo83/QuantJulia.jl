@@ -122,7 +122,7 @@ end
 
 function model_value!(sh::SwaptionHelper)
   calculate!(sh)
-  update_pricing_engine!(sh.swaption, sh.pricingEngine)
+  sh.swaption = update_pricing_engine(sh.swaption, sh.pricingEngine) # this might clone swaption
   return npv(sh.swaption)
 end
 
@@ -130,7 +130,7 @@ function black_price!(swaptionHelper::SwaptionHelper, sigma::Float64)
   calculate!(swaptionHelper)
   # stuff
   black = BlackSwaptionEngine(swaptionHelper.yts, Quote(sigma), Actual365(), swaptionHelper.shift)
-  update_pricing_engine!(swaptionHelper.swaption, black)
+  swaptionHelper.swaption = update_pricing_engine(swaptionHelper.swaption, black)
   # swaptionHelper.swaption.pricingEngine = black
   value = npv(swaptionHelper.swaption)
   return value

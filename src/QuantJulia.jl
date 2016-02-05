@@ -79,7 +79,7 @@ export
     BlackIborCouponPricer, IborCoupon, IborLeg, update_pricer!,
 
     # instruments/Instruments.jl
-    update_pricing_engine!,
+    update_pricing_engine,
 
     # instruments/bond.jl
     BondMixin, FixedRateBond, FloatingRateBond, ZeroCouponBond, value, get_settlement_days, get_settlement_date, notional, accrued_amount, yield, duration, npv, clean_price, dirty_price, accrued_amount,
@@ -125,7 +125,7 @@ export
 
 
     # models/calibration_helpers.jl
-    SwaptionHelper, implied_volatility!, add_times_to!, model_value!,
+    SwaptionHelper, implied_volatility!, add_times_to!, model_value!, update_pricing_engine!, # for swaptionHelper only
 
     # models/short_rate/short_rate.jl
     PrivateConstraint, test, calibrate!, func_values, value, get_params,

@@ -149,31 +149,31 @@ function main()
 
   bermudanSwaption = Swaption(atmSwap, bermudanExercise)
 
-  update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(modelG2, 50))
+  bermudanSwaption = update_pricing_engine(bermudanSwaption, TreeSwaptionEngine(modelG2, 50))
 
   println(@sprintf("G2 (tree):       %.6f", npv(bermudanSwaption)))
 
-  update_pricing_engine!(bermudanSwaption, FdG2SwaptionEngine(modelG2))
+  bermudanSwaption = update_pricing_engine(bermudanSwaption, FdG2SwaptionEngine(modelG2))
 
   println(@sprintf("G2 (fdm):       %.6f", npv(bermudanSwaption)))
 
-  update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(hullWhiteModel, 50))
+  bermudanSwaption = update_pricing_engine(bermudanSwaption, TreeSwaptionEngine(hullWhiteModel, 50))
 
   println(@sprintf("HW (tree):       %.6f", npv(bermudanSwaption)))
 
-  update_pricing_engine!(bermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel))
+  bermudanSwaption = update_pricing_engine(bermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel))
 
   println(@sprintf("HW (fdm):       %.6f", npv(bermudanSwaption)))
 
-  update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(hullWhiteModel2, 50))
+  bermudanSwaption = update_pricing_engine(bermudanSwaption, TreeSwaptionEngine(hullWhiteModel2, 50))
 
   println(@sprintf("HW (num, tree):       %.6f", npv(bermudanSwaption)))
 
-  update_pricing_engine!(bermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel2))
+  bermudanSwaption = update_pricing_engine(bermudanSwaption, FdHullWhiteSwaptionEngine(hullWhiteModel2))
 
   println(@sprintf("HW (num, fdm):       %.6f", npv(bermudanSwaption)))
 
-  update_pricing_engine!(bermudanSwaption, TreeSwaptionEngine(blackKarasinski, 50))
+  bermudanSwaption = update_pricing_engine(bermudanSwaption, TreeSwaptionEngine(blackKarasinski, 50))
 
   println(@sprintf("BK:       %.6f", npv(bermudanSwaption)))
 

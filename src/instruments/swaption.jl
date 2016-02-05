@@ -25,11 +25,11 @@ type Swaption{E <: Exercise, S <: SettlementType, P <: PricingEngine} <: Option
   results::SwaptionResults
   pricingEngine::P
 
-  function call{E, S}(::Type{Swaption}, lz::LazyMixin, swap::VanillaSwap, exercise::E, delivery::S, results::SwaptionResults)
-    new{E, S, PricingEngine}(lz, swap, exercise, delivery, results)
-  end
+  # function call{E, S}(::Type{Swaption}, lz::LazyMixin, swap::VanillaSwap, exercise::E, delivery::S, results::SwaptionResults)
+  #   new{E, S, PricingEngine}(lz, swap, exercise, delivery, results)
+  # end
 
-  function call{E, S, P}(::Type{Swaption}, lz::LazyMixin, swap::VanillaSwap, exercise::E, delivery::S, results::SwaptionResults, pricingEngine::P)
+  function call{E, S, P}(::Type{Swaption}, lz::LazyMixin, swap::VanillaSwap, exercise::E, delivery::S, results::SwaptionResults, pricingEngine::P = NullSwaptionEngine())
     new{E, S, P}(lz, swap, exercise, delivery, results, pricingEngine)
   end
 end
@@ -48,3 +48,13 @@ function npv(swaption::Swaption)
 
   return swaption.results.value
 end
+
+function clone(swaption::Swaption; pe::PricingEngine = swaption.pricingEngine)
+  lazyMixin, res = pe == swaption.pricingEngine ? (swaption.lazyMixin, swaption.results) : (LazyMixin(), SwaptionResults())
+
+  newSwaption = Swaption(lazyMixin, swaption.swap, swaption.exercise, swaption.delivery, res, pe)
+
+  return newSwaption
+end
+
+get_pricing_engine_type{E, S, P}(::Swaption{E, S, P}) = P
